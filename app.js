@@ -4,6 +4,10 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 
+var MongoClient = require('mongodb').MongoClient;
+var mongoURL = "mongodb://127.0.0.1:27017";
+var db;
+
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 
@@ -36,6 +40,20 @@ app.use(function(err, req, res, next) {
   // render the error page
   res.status(err.status || 500);
   res.render('error');
+});
+
+MongoClient.connect(mongoURL, function(error, database){
+	if(error){
+		throw error;
+	}
+
+	db = database.db("onlineMRF");
+	module.exports.db = db;
+
+	console.log("MongoDB connection established");
+	app.listen(3000, function() {
+		console.log("Express server listening on port 3000");
+	});
 });
 
 module.exports = app;
