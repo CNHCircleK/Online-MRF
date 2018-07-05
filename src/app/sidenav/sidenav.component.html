@@ -1,0 +1,12 @@
+<nav class="menu" [class.active]="isExpanded" #sidenav
+		(mouseover)="isExpanded = true" (mouseout)="isExpanded = false">
+	<ul>
+		<li *ngFor="let link of links">
+			<a [routerLink]="link.route">
+				<mat-icon>{{ link.icon }}</mat-icon>
+				<span>{{ link.text }}</span>
+			</a>
+		</li>
+
+	</ul>
+</nav>

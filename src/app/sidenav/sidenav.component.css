@@ -1,0 +1,54 @@
+.menu {
+	position: fixed;
+    background: black; /* TODO: move to theme */
+    top: 0;
+    bottom: 0;
+    left: 0;
+    overflow: hidden;
+    width: 60px; /* will be transitioned to 340px */
+    transition: width 0.3s;
+    z-index: 10;
+}
+
+.menu.active {
+    width: 240px;
+}
+
+/* Make list items think they belong in the full open width */
+.menu ul {
+    position: absolute;
+    z-index: 10;
+    /*overflow-y: scroll;*/
+    width: 240px;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    text-transform: none;
+    text-decoration: none;
+    font-weight: 300;
+    font-family: 'Lato', Arial, sans-serif;
+    line-height: 60px;
+}
+
+.menu a mat-icon {
+    vertical-align: middle;
+    padding-left: 18px;
+}
+
+.menu a {
+    color: white; /* TODO: move to theme */
+    display: inline-block;
+    height: 100%;
+    text-decoration: none;
+}
+
+.menu a span {
+    display: none;
+    /*vertical-align: middle;*/
+    padding-left: 35px;
+    /*overflow-x: hidden;*/
+}
+.menu.active a span {
+    display: inline-block;
+}

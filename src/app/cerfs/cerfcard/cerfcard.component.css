@@ -1,0 +1,35 @@
+/*.card {
+	background: black;
+}
+::ng-deep .mat-card {
+	box-sizing: border-box;
+	width: 25px !important;
+	color: blue;
+}*/
+
+/* None of this is working!!! */
+/*.md-unstyled-image img{
+  max-width: 100%;
+  width: auto;
+  height: auto !important; /* needs to be important because md-card also sets it that way */
+/*.cerfnav-list-item {
+	display: inline-block;
+	margin: 20px;
+	vertical-align: top;
+	width: 260px;
+}*/
+/*.mat-card {
+	padding: 20px;
+}*/
+/*.mat-card-title {
+	font-weight: 400;
+	font-size: 10px;
+}*/
+.mat-card-header-text {
+	margin: auto;
+	text-align: center;
+}
+
+a {
+	text-decoration: none;
+}

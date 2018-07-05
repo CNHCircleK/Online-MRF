@@ -1,0 +1,23 @@
+<a mat-icon-button style="display: inline-block;" [routerLink]="['/cerfs']">
+	<mat-icon>arrow_back</mat-icon>
+</a>
+<p style="display: inline-block;">Cerf ID: {{ id }}</p>
+
+<form>
+	<mat-form-field>
+		<input matInput placeholder="Event Name" value="{{data.data.eventName}}"/>
+	</mat-form-field>
+
+	<mat-form-field>
+		<input matInput placeholder="CERF Author" value="{{data.data.author}}"/>
+	</mat-form-field>
+
+	<mat-form-field>
+		<input matInput placeholder="Members Attended" value="{{data.data.membersAttended}}"/>
+	</mat-form-field>
+	<br/>
+
+	<mat-form-field>
+		<input matInput placeholder="Hours" value="{{data.data.hours}}"/>
+	</mat-form-field>
+</form>
