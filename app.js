@@ -8,8 +8,7 @@ var MongoClient = require('mongodb').MongoClient;
 var mongoURL = "mongodb://127.0.0.1:27017";
 var db;
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
+var session = require('express-session')
 
 var app = express();
 
@@ -23,8 +22,24 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/', indexRouter);
-app.use('/users', usersRouter);
+const sessionSecret = "SESSION_SECRET" in process.env ? process.env['SESSION_SECRET'] : require("crypto").randomBytes(64).toString('hex');
+//TODO Change MemoryStore in production
+app.use(session({
+	secret: sessionSecret,
+	resave: false,
+	saveUninitialized: false,
+	expires: new Date(Date.now() + (60 * 30 * 1000))
+}));
+
+function route(routeName, routerLocation = null){
+	var router = require('./routes/' + (routerLocation != null ? routerLocation : routeName));
+	app.use('/' + routeName, router);
+}
+
+route('', 'index');
+route('admin');
+route('signup');
+route('signin');
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
@@ -47,7 +62,7 @@ MongoClient.connect(mongoURL, function(error, database){
 		throw error;
 	}
 
-	db = database.db("onlineMRF");
+	db = database.db("cnhMRF");
 	module.exports.db = db;
 
 	console.log("MongoDB connection established");
