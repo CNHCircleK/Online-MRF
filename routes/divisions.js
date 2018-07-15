@@ -17,4 +17,16 @@ router.all('*', function(req, res, next){
 	}
 });
 
+router.get("/:clubId", function(req, res, next){
+	res.send("Show options");
+});
+
+router.get("/:clubId/members", function(req, res, next){
+	res.send("Show list of members")
+});
+
+router.get("/:clubId/mrfs", function(req, res, next){
+	res.send("Show list of mrfs");
+});
+
 module.exports = router;

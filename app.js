@@ -8,7 +8,8 @@ var MongoClient = require('mongodb').MongoClient;
 var mongoURL = "mongodb://127.0.0.1:27017";
 var db;
 
-var session = require('express-session')
+var session = require('express-session');
+var MemoryStore = require('memorystore')(session);
 
 var app = express();
 
@@ -23,11 +24,17 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const sessionSecret = "SESSION_SECRET" in process.env ? process.env['SESSION_SECRET'] : require("crypto").randomBytes(64).toString('hex');
-//TODO Change MemoryStore in production
 app.use(session({
 	secret: sessionSecret,
 	resave: false,
+	store: new MemoryStore({
+		checkPeriod: 86400000
+	}),
 	saveUninitialized: false,
+	cookie:{
+		secure: false, //CHANGE IN PRODUCTION
+		expires: new Date(Date.now() + (60 * 30 * 1000))
+	},
 	expires: new Date(Date.now() + (60 * 30 * 1000))
 }));
 
@@ -40,6 +47,10 @@ route('', 'index');
 route('admin');
 route('signup');
 route('signin');
+route('members');
+route('events');
+route('clubs');
+route('mrfs');
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

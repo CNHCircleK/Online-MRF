@@ -4,193 +4,225 @@ var app;
 
 var mongo = require('mongodb');
 var ObjectId = mongo.ObjectId;
-
 var mongoSanitize = require('express-mongo-sanitize');
 
-var crypto = require('crypto');
-
-var bcrypt = require('bcrypt');
-const SALT_ROUNDS = 10;
+var utils;
 
 router.all('*', function(req, res, next){
-	app = req.app;
-	next();
+	//if(req.session.userId == null){
+		//res.redirect('/signin');
+	//}else{
+		app = req.app;
+		utils = require('mrf-utils')(app);
+		next();			
+	//}
 });
 
 router.get('/', function(req, res, next) {
-	generateRegistrationCode("5b4681d2b7cdfe0e673f486e", [], "5b3efbf307f2a3084adc2426", function(success){
-		console.log(success);
-	});
-  	res.send('Finished');
+  	res.send('Show options. View divisions/options');
 });
 
-function createDivision(name){
-	var obj = {"name": name, "clubs": []}
-	app.db.collection("divisions").insertOne(mongoSanitize.sanitize(obj));
-	return true;
-}
+router.get('/divisions', function(req, res, next){
+	res.send("Show list of divisions");
+});
 
-function createNew(collection, data, parentCollection, parentId, callback = function(){}){
-	if(!ObjectId.isValid(parentId)){
-		callback(false);
-		return;
+router.get('/divisions/create', function(req, res, next){
+	res.send("Show new division form");
+});
+
+router.post('/divisions/create', function(req, res, next){
+	var body = req.body;
+	if('name' in body){
+		var data = {"name": body['name'], "clubs": []};
+		app.db.collection("divisions").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
+			if(err) throw err;
+			res.send("Success");
+		});
 	}
+});
 
-	var newId = ObjectId();
-	var query = {_id: ObjectId(parentId)};
-	
-	var obj = {};
-	obj[collection] = newId;
-	var changes = {$push: obj};
+router.get('/clubs', function(req, res, next){
+	res.send("List of clubs in district");
+});
 
-	app.db.collection(parentCollection).updateOne(query, changes, function(err, res){
-		if(err) throw err;
-		if(res.matchedCount > 0){
-			data._id = newId;
-			app.db.collection(collection).insertOne(mongoSanitize.sanitize(data));
-		}
+router.get('/clubs/create', function(req, res, next){
+	res.send("Club creation form");
+});
 
-		callback(res.matchedCount > 0);
-	});
-}
-
-function createClub(school, divisionId, callback = function(){}){
-	return createNew(
-		"clubs", 
-		{
-			"school": school, 
-			"members": [], 
-			"mrfs": []
-		}, 
-		"divisions", 
-		divisionId,
-		callback);
-}
-
-function createMember(firstName, lastName, clubId, callback = function(){}){
-	return createNew(
-		"members", 
-		{
-			"name": {
-				"first": firstName, 
-				"last": lastName
+router.post('/clubs/create', function(req, res, next){
+	var body = req.body;
+	if(utils.allIn(body, ['name', 'divisionId'])){
+		var data = {
+			"name": body['name'],
+			"division_id": ObjectId(body['divisionId']),
+			"members": [],
+			"admin":{
+				"advisor": {
+					"faculty": null,
+					"kiwanis": null
+				},
+				"executive": {
+					"president": null,
+					"avp": null,
+					"svp": null,
+					"secretary": null,
+					"treasurer": null 
+				},
+				"appointed": {}
+			},
+			"mrfs": [],
+			"goals":{
+				"service": {
+					"hours":{
+						"total": null,
+						"perMember": null
+					},
+					"fundraising": {
+						"ptp": null,
+						"fa": null,
+						"kfh": null
+					},
+					"other": []
+				},
+				"leadership": {
+					"other": []
+				},
+				"fellowship": {
+					"duesPaid": null,
+					"interclubs": null
+				}
 			}
-		}, 
-		"clubs", 
-		clubId,
-		callback);
-}  
+		};
+		utils.createNew("clubs", data, "divisions", body['divisionId'], function(err, success){
+			if(err) throw err;
+			if(success){
+				res.redirect("/clubs");
+			}else{
+				res.send("Invalid Division");
+			}
+		});
+	}
+});
+
+router.get('/tags/create', function(req, res, next){
+	res.send("Show tag creation form");
+});
+
+router.post('/tags/create', function(req, res, next){
+	var body = req.body;
+	if(utils.allIn(body, ['name', 'abbrev'])){
+		var data = {"name": name, "abbrev": abbrev};
+		app.db.collection("tags").insertOne(mongoSanitize.sanitize(obj), function(err, insertRes){
+			if(err) throw err;
+			if(insertRes.insertedCount > 0){
+				res.redirect("/tags");
+			}else{
+				res.send("Error");
+			}
+		});	
+	}
+});
 
 function createMRF(year, month, clubId, callback = function(){}){
-	return createNew(
-		"mrfs",
-		{
-			"year": year,
-			"month": month, 
-			"status": 0,
-			"events": [],
-			"submissionTime": null
+	var data = {
+		"year": year,
+		"month": month,
+		"clubId": ObjectId(clubId),
+		"status": 0,
+		"submissionTime": null,
+		"updates": {
+			"duesPaid": null,
+			"newDuesPaid": null
 		},
-		"clubs",
-		clubId,
-		callback)
-}
-
-function createEvent(
-	name, 
-	chairId,
-	startTime, 
-	endTime, 
-	location, 
-	tags,
-	serviceHours, 
-	leadershipHours, 
-	fellowshipHours, 
-	fundraised,
-	mrfId,
-	callback = function(){}){
-
-	return createNew(
-		"events", 
-		{
-			"name": name,
-			"chair_id": chairId,
-			"time":{
-				"start": startTime,
-				"end": endTime
+		"goals": [],
+		"meetings": {
+			"1":{
+				"members": null,
+				"nonHomeMembers": null,
+				"kiwanis": null,
+				"guests": null,
+				"advisorAttendance":{
+					"faculty": null,
+					"kiwanis": null
+				}
 			},
-			"location": location,
-			"tags": tags,
-			"attendees": [],
-			"hoursPerAttendee": {
-				"service": serviceHours, 
-				"leadership": leadershipHours, 
-				"fellowship" : fellowshipHours
+
+			"2":{
+				"members": null,
+				"nonHomeMembers": null,
+				"kiwanis": null,
+				"guests": null,
+				"advisorAttendance":{
+					"faculty": null,
+					"kiwanis": null
+				}
 			},
-			"overrideHours": [],
-			"fundraised": fundraised,
-			"status": 0
+
+			"3":{
+				"members": null,
+				"nonHomeMembers": null,
+				"kiwanis": null,
+				"guests": null,
+				"advisorAttendance":{
+					"faculty": null,
+					"kiwanis": null
+				}
+			},
+
+			"4":{
+				"members": null,
+				"nonHomeMembers": null,
+				"kiwanis": null,
+				"guests": null,
+				"advisorAttended":{
+					"faculty": null,
+					"kiwanis": null
+				}
+			},
+
+			"5":{
+				"members": null,
+				"nonHomeMembers": null,
+				"kiwanis": null,
+				"guests": null,
+				"advisorAttendance":{
+					"faculty": null,
+					"kiwanis": null
+				}
+			}
 		},
-		"mrfs",
-		mrfId,
-		callback
-	);
-} 
 
-function createTag(name, abbrev, callback = function(){}){
-	var obj = {"name": name, "abbrev": abbrev};
-	app.db.collection("tags").insertOne(mongoSanitize.sanitize(obj), function(err, res){
-		if(err) throw err;
-		callback(res.insertedCount > 0);
-	});
+		"dcm":{
+			"date": null,
+			"presidentAttended": null,
+			"members": null,
+			"nextDcmDate": null
+		},
+
+		"feedback":{
+			"ltg":{
+				"message": null,
+				"contacted":{
+					"visit": null,
+					"phone": null,
+					"email": null,
+					"newsletter": null,
+					"other": null
+				}
+			},
+			"dboard": null
+		},
+
+		"kfamReport":{
+			"completed": null
+		},
+
+		"events": []
+	};
+
+	utils.createNew("mrfs", data, "clubs", clubId);
 }
 
-function generateRegistrationCode(memberId, access, sourceId, callback = function(){}){
-	if(!ObjectId.isValid(memberId) || !ObjectId.isValid(sourceId)){
-		callback(false);
-		return;
-	}
-
-	var checkSource = {"_id": ObjectId(sourceId)};
-	app.db.collection("members").find(checkSource, function(err, res){
-		if(err) throw err;
-		if(res != null){
-			crypto.randomBytes(24, function(err, buffer) {
-				if(err) throw err;
-				var codeId = ObjectId();
-				var secret = buffer.toString('hex');
-
-				bcrypt.hash(secret, SALT_ROUNDS, function(err, hash){
-					if(err) throw err;
-					var query = {"_id": ObjectId(memberId), "username": {$exists: false}};
-
-					var expire = new Date();
-					expire.setMonth(expire.getMonth() + 1);
-
-					var changes = {$set: {registration: {
-						"_id": codeId,
-						"secret": hash,
-						"source_id": sourceId,
-						"access": access,
-						"expiration": expire
-					}}};
-
-					app.db.collection("members").updateOne(query, changes, function(err, res){
-						if(err) throw err;
-						if(res.matchedCount > 0){
-							callback(codeId + secret);
-						}else{
-							callback(false);
-						}
-						
-					});
-				});
-			});
-		}else{
-			callback(false);
-		}
-	});
-}
 
 module.exports = router;
  
