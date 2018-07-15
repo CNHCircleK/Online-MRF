@@ -1,0 +1,78 @@
+<!-- 
+	<div fxLayout="row" fxLayout.xs="column" fxLayoutWrap="wrap">
+		<app-cerfcard fxFlex.gt-xs="50%" [fxFlex.gt-md]="100/3" *ngFor="let number of [0, 1, 2, 3, 4]"></app-cerfcard>
+	</div> -->
+<!-- <div class="flex" fxLayoutAlign="start start">
+	<app-cerfcard *ngFor="let cerf of importedData; let i = index" [data]="importedData[i]"
+		[class.mat-elevation-z8]="cerf.hovered" (mouseover)="cerf.hovered=true" (mouseout)="cerf.hovered=false"
+	></app-cerfcard>
+
+	<mat-card class="card"
+		[class.mat-elevation-z8]="hovered" (mouseover)="hovered=true" (mouseout)="hovered=false"
+		(click)="newCerf()">
+	<mat-card-header>
+		<mat-card-title>{{data.name}}</mat-card-title>
+		<mat-card-subtitle>{{data.time.start}}</mat-card-subtitle>
+		<mat-card-subtitle>{{data.chair_id}}</mat-card-subtitle>
+	</mat-card-header>
+	<img src="https://www.google.com/images/icons/product/spreadsheets-128.png">
+		<mat-card-title>New CERF</mat-card-title>
+	</mat-card>
+
+</div> -->
+
+<!-- SEARCH FEATURE -->
+<div>
+	<mat-form-field>
+		<input matInput (keyup)="applyFilter($event.target.value)" placeholder="Search">
+    <mat-icon matSuffix>search</mat-icon>
+	</mat-form-field>
+</div>
+
+<mat-table [(dataSource)]="list" matSort>
+
+	<!-- CERF name Column -->
+    <ng-container matColumnDef="name">
+      <mat-header-cell *matHeaderCellDef mat-sort-header> Name </mat-header-cell>
+      <mat-cell *matCellDef="let row">{{row.name}}</mat-cell>
+    </ng-container>
+
+    <!-- Progress Column -->
+    <ng-container matColumnDef="chair_id">
+      <mat-header-cell *matHeaderCellDef mat-sort-header> Chair </mat-header-cell>
+      <mat-cell *matCellDef="let row">{{row.chair_id}}</mat-cell>
+    </ng-container>
+
+    <!-- Name Column -->
+    <ng-container matColumnDef="time.start">
+      <mat-header-cell *matHeaderCellDef mat-sort-header> Time </mat-header-cell>
+      <mat-cell *matCellDef="let row">{{row.time.start}}</mat-cell>
+    </ng-container>
+
+
+    <!-- Action Column -->
+    <ng-container matColumnDef="action">
+      <mat-header-cell *matHeaderCellDef> Action </mat-header-cell>
+      <mat-cell *matCellDef="let row">
+      	<a mat-icon-button [routerLink]="['/cerf', row._id]"><mat-icon>open_in_new</mat-icon></a>
+      	<button *ngIf="mrfId" mat-icon-button (click)="removeCerfFromMrf(row._id)"><mat-icon>delete_outline</mat-icon></button>
+      </mat-cell>
+    </ng-container>
+
+    <!-- Status Column (MRF View Only) -->
+    <ng-container matColumnDef="status">
+      <mat-header-cell *matHeaderCellDef> Status </mat-header-cell>
+      <mat-cell *matCellDef="let row">
+      	<mat-icon *ngIf="row.status==1">notifications</mat-icon>
+      	<mat-icon *ngIf="row.status==0">notifications_none</mat-icon>
+      </mat-cell>
+    </ng-container>
+
+    <!-- Header columns -->
+    <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+    <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
+</mat-table>
+
+<mat-paginator [pageSizeOptions]="[10, 25, 50]"></mat-paginator>
+
+<a mat-raised-button (click)="newCerf()">Create New CERF</a>

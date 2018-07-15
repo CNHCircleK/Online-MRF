@@ -1,0 +1,11 @@
+div.flex {
+	display: flex;
+	flex-flow: row wrap;
+	padding: 20px;
+}
+app-cerfcard {
+	margin: 20px;
+	position: relative;
+	z-index: 1;
+}
+/* Stolen from CerfNav */

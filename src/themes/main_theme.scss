@@ -1,0 +1,67 @@
+/*
+
+// Define the palettes for your theme using the Material Design palettes available in palette.scss
+// (imported above). For each palette, you can optionally specify a default, lighter, and darker
+// hue. Available color palettes: https://material.io/design/color/
+$graphic-standard-primary: #003D79;
+$graphic-standard-accent:  #F2E18B;
+
+// The warn palette is optional (defaults to red).
+$graphic-standard-warn:    #820024;
+
+// Create the theme object (a Sass map containing all of the palettes).
+$graphic-standard-theme: mat-light-theme($graphic-standard-primary, $graphic-standard-accent, $graphic-standard-warn);*/
+
+
+$standardColors: (
+	white: #ffffff,
+	yellow: #F2E18B,
+	oliveGreen: #9EA374,
+	lightBlue: #C7D6EE,
+	red: #820024,
+	grey: #eee,		// not in style-guide, but taken from cnhcirclek.org
+	darkGrey: #58595B,
+	orange: #F58025,
+	green: #6A9448,
+	cyan: #00A5D9,
+	blue: #003D79,
+	black: #231F20,
+);
+
+
+// Only light themes are used right now. Just switch the keys (light <-> dark) if you want to experiment with a dark theme
+// I'll hook up a toggle later
+$themes: (
+	light: (
+		backgroundColor: map-get($standardColors, white),	// White
+		navColor: map-get($standardColors, white),
+		textColor: map-get($standardColors, black),	// CNH Black
+		altTextColor: map-get($standardColors, white),	// White - currently used for table header color
+		linkColor: map-get($standardColors, blue),	// CNH Blue - for sidenav <a>
+
+		tableHeader: map-get($standardColors, blue),
+		tableColor1: map-get($standardColors, lightBlue),	// CNH Light Blue
+		tableColor2: map-get($standardColors, white)
+
+	),
+
+	dark: (
+		backgroundColor: map-get($standardColors, darkGrey),
+		navColor: map-get($standardColors, blue),
+		textColor: map-get($standardColors, white),
+		altTextColor: map-get($standardColors, balck),
+		linkColor: map-get($standardColors, white),
+
+		tableHeader: map-get($standardColors, green),
+		tableColor1: map-get($standardColors, oliveGreen),	// CNH Olive Green
+		tableColor2: map-get($standardColors, white)
+	),
+);
+
+@function get-light($prop: 'backgroundColor') {
+	@return map-get(map-get($themes, light), $prop);
+}
+
+@function get-dark($prop: 'backgroundColor') {
+	@return map-get(map-get($themes, dark), $prop);
+}

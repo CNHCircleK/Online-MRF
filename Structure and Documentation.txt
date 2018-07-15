@@ -1,0 +1,36 @@
+For building in production and uploading to Github Pages
+	ng build --prod --base-href "https://cnhcirclek.github.io/MRF-Frontend/"
+	(project name case sensitive and need the slash at the end)
+
+	ngh --dir=dist/portal --repo=https://user:pass@github.com/CNHCircleK/MRF-Frontend.git
+	(npm install -g angular-cli-ghpages)
+
+Modules used:
+	angular-cli-ghpages (pushes to github pages)
+	ngx-pwa/local-storage (Angular IndexedDB implementation for client-side storage)
+
+Folder structure (src/app)
+	|-- app
+		|-- modules
+			|-- sidenav
+				|-- sidenav.component.css
+				|-- sidenav.component.html
+				|-- sidenav.component.ts
+			|-- datanav
+				|-- cerf
+					|-- cerf.component.css/html/ts
+				|-- mrf
+					|-- mrf.component.css/html/ts
+				|-- cerflist 	// table of CERFs, dynamically loaded in its own page or within mrf
+				|-- mrflist		// table of MRFs
+		|-- core 	// imitates app.module.ts, handles core functionality, but is not bootstrapped
+			|-- [+] authentication
+			|-- [+] data 	// handler for both cerf and mrf data
+			|-- [+] guards 	// guard routing, whether for auth or data purposes
+			|-- core.module.ts
+		|-- [+] configs
+	|-- assets
+	|-- styles	// contains global/partial styling
+	|-- themes	// isolation of theme from styling. In a .scss file, you can @import 'main_theme.scss';
+
+Edited tsconfig.json ("paths" --> able to path using @app and @core) and angular.json ("options > stylePreprocessorOptions")

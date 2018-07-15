@@ -1,7 +1,0 @@
-<!-- 
-	<div fxLayout="row" fxLayout.xs="column" fxLayoutWrap="wrap">
-		<app-cerfcard fxFlex.gt-xs="50%" [fxFlex.gt-md]="100/3" *ngFor="let number of [0, 1, 2, 3, 4]"></app-cerfcard>
-	</div> -->
-<div class="flex">
-	<app-cerfcard *ngFor="let cerf of importedData; let i = index" [data]="importedData[i]"></app-cerfcard>
-</div>

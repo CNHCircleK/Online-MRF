@@ -1,0 +1,22 @@
+.mat-form-field {
+	padding-left: 5px;
+	padding-right: 5px;
+}
+
+.mat-table {
+	padding-bottom: 15px;
+}
+
+button.mat-raised-button & a.mat-icon-button {
+	display: inline-block;
+	vertical-align: middle;
+}
+
+#cerf-info {
+	display: inline-block;
+	vertical-align: middle;
+}
+
+div {	/* Distinguish input fields from header by pushing it to the right */
+	margin-left: 20px;
+}

@@ -1,0 +1,21 @@
+<a mat-icon-button style="display: inline-block;" (click)="goBack()">
+	<mat-icon>arrow_back</mat-icon>
+</a>
+<p style="display: inline-block;">Mrf ID: {{ data._id }} | Month: {{ data.month }} </p>
+
+<form #mrfForm="ngForm">
+	<mat-form-field>
+		<input matInput placeholder="MRF Author" value="Secretary"/>
+	</mat-form-field>
+
+	<mat-form-field>
+		<input matInput placeholder="Total Service Hours" value="241"/>
+		<button matSuffix mat-icon-button matTooltip="Update hours from CERFs"><mat-icon>update</mat-icon></button>
+	</mat-form-field>
+
+	<br/>
+	<p>Events Cerf ID: {{ data.events }}</p>
+	<app-cerflist [mrfId]="data._id"></app-cerflist>
+
+
+</form>

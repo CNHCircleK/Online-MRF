@@ -1,0 +1,23 @@
+@import 'main_theme.scss';
+
+.menu {
+    background: get-light(navColor);
+    border-right: 2px solid get-light(linkColor);
+
+    a {
+		color: get-light(linkColor);
+	}
+
+	/*li:hover {
+		border-left: 2px solid map-get(map-get($themes, light), linkColor);
+	}*/
+}
+
+/*.theme-dark .menu {
+    background: get-dark(navColor);
+    border-right: 2px solid get-dark(linkColor);
+
+    a {
+		color: get-dark(linkColor);
+	}
+}*/

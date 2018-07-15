@@ -20,9 +20,13 @@
 
  -->
 
- <app-sidenav [level]='5'></app-sidenav>
+<div [class.theme-light]="true">
+  <app-sidenav [level]='5'></app-sidenav>
 
-<div class="content">
-  <router-outlet></router-outlet>
-  <!-- Display routed components here (default HomeComponent) -->
+  <div class="content" mat-app-background>
+    <router-outlet></router-outlet>
+    <!-- Display routed components here (default HomeComponent) -->
+  </div>
+
+  <!-- <img src="https://cdn.frontify.com/api/screen/thumbnail/FHd1PlvaEqeBliTpoW9zibX7hYY6Z3QdmxeeT6H5JnKZn5PsGCyJNLzD414j3q-bIcezE3zs6-E3SrtjKk5H4w/2398"> -->
 </div>

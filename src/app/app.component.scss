@@ -1,0 +1,26 @@
+@import 'main_theme.scss';
+
+.theme-light {
+	
+	/*overflow-y: scroll; overflow-x: hidden;*/
+	background-color: get-light(backgroundColor);
+
+
+	.content {
+		/* Take up whole page */ position: fixed; top: 0; left: 60px; /* Account for sidenav */ right: 0; height: 100%; overflow-y: auto;
+		overflow-x: inherit;
+		padding-left: 20px;
+		padding-right: 20px;
+		font-family: Roboto,"Helvetica Neue Light","Helvetica Neue",Helvetica,Arial,"Lucida Grande",sans-serif;
+		z-index: 1;
+	}
+
+	img {
+		width: 100%;
+		height: auto;
+		/*margin-left: 80px;*/
+		align-self: right;
+	}
+}
+
+

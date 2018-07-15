@@ -1,0 +1,61 @@
+<!-- 
+	<div fxLayout="row" fxLayout.xs="column" fxLayoutWrap="wrap">
+		<app-cerfcard fxFlex.gt-xs="50%" [fxFlex.gt-md]="100/3" *ngFor="let number of [0, 1, 2, 3, 4]"></app-cerfcard>
+	</div> -->
+<div class="flex">
+	<!-- <app-mrfcard *ngFor="let mrf of importedData; let i = index" [data]="importedData[i]"
+		[class.mat-elevation-z8]="mrf.hovered" (mouseover)="mrf.hovered=true" (mouseout)="mrf.hovered=false"></app-mrfcard> -->
+</div>
+
+<div>
+	<mat-form-field>
+		<input matInput (keyup)="applyFilter($event.target.value)" placeholder="Search">
+    <mat-icon matSuffix>search</mat-icon>
+	</mat-form-field>
+</div>
+
+<mat-table [dataSource]="list" matSort>
+
+	<!-- Month Column -->
+    <ng-container matColumnDef="month">
+      <mat-header-cell *matHeaderCellDef mat-sort-header> Month </mat-header-cell>
+      <mat-cell *matCellDef="let row">{{row.month}}</mat-cell>
+    </ng-container>
+
+    <!-- Year Column -->
+    <ng-container matColumnDef="year">
+      <mat-header-cell *matHeaderCellDef mat-sort-header> Year </mat-header-cell>
+      <mat-cell *matCellDef="let row">{{row.year}}</mat-cell>
+    </ng-container>
+
+    <!-- Name Column -->
+    <!-- <ng-container matColumnDef="label">
+      <mat-header-cell *matHeaderCellDef mat-sort-header> Label </mat-header-cell>
+      <mat-cell *matCellDef="let row">{{row}}</mat-cell>
+    </ng-container> -->
+
+
+    <!-- Action Column -->
+    <ng-container matColumnDef="action">
+      <mat-header-cell *matHeaderCellDef> Action </mat-header-cell>
+      <mat-cell *matCellDef="let row">
+      	<a mat-icon-button [routerLink]="['/mrf', row._id]"><mat-icon>open_in_new</mat-icon></a>
+      	<button mat-icon-button><mat-icon>delete_outline</mat-icon></button>
+      </mat-cell>
+    </ng-container>
+
+    <!-- Status Column (MRF View Only) -->
+    <ng-container matColumnDef="status">
+      <mat-header-cell *matHeaderCellDef> Status </mat-header-cell>
+      <mat-cell *matCellDef="let row">
+      	<mat-icon>notification</mat-icon>
+      	<mat-icon>notifications_none</mat-icon>
+      </mat-cell>
+    </ng-container>
+
+    <!-- Header columns -->
+    <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+    <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
+</mat-table>
+
+<mat-paginator [pageSizeOptions]="[10, 25, 50]"></mat-paginator>

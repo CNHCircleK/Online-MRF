@@ -1,0 +1,11 @@
+.mat-header-row {
+	background-color:  #F2E18B;
+}
+
+mat-row:nth-child(even){
+	background-color: #d8dbbe;
+}
+
+mat-row:nth-child(odd){
+	background-color: #9EA374;
+}

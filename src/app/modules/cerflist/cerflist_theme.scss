@@ -1,0 +1,16 @@
+@import 'main_theme.scss';
+
+.mat-header-row {
+	background-color:  get-light(tableHeader);
+	.mat-header-cell {
+		color: get-light(altTextColor);
+	}
+}
+
+mat-row:nth-child(even){
+	background-color: get-light(tableColor1);
+}
+
+mat-row:nth-child(odd){
+	background-color: get-light(tableColor2);
+}
