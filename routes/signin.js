@@ -5,7 +5,7 @@ var app;
 var mongoSanitize = require('express-mongo-sanitize');
 
 var bcrypt = require('bcrypt');
-const SALT_ROUNDS = 10;
+var auth = require("./auth");
 
 var utils;
 
@@ -15,33 +15,39 @@ router.all('*', function(req, res, next){
 	next();	
 });
 
-router.get('/', function(req, res, next){
-	res.send("Send signin page");
-});
-
 router.post('/', function(req, res, next){
 	var body = req.body;
-	if(utils.allIn(body, ['name', 'password'])){
-		var findUser = {$or:[mongoSanitize.sanitize({"username": body['name']}), mongoSanitize.sanitize({"email": body['name']}) ]};
-		app.db.collection("members").findOne(findUser, function(err, user){
+	var errors = {};
+
+	utils.checkIn(body, ['name', 'password'], function(elem, res){
+		if(!res){
+			errors[elem] = "Required";
+		}
+	});
+
+	if(Object.keys(errors).length == 0){
+		var query = {$or:[mongoSanitize.sanitize({username: body['name']}), mongoSanitize.sanitize({email: body['name']}) ]};
+		var projection = {name: 1, club_id: 1, division_id: 1, access: 1};
+
+		app.db.collection("members").findOne(query, projection, function(err, member){
 			if(err) throw err;
-			if(user != null){
-				bcrypt.compare(body['password'], user.password, function(err, matched){
+			if(member != null){
+				bcrypt.compare(body['password'], member.password, function(err, matched){
 					if(err) throw err;
 					if(matched){
-						req.session.userId = user._id;
-						req.session.save();
-						res.send("Success");
+						auth.signToken(app, member, function(err, token){
+							res.send({success: true, auth: true, result: token});
+						});
 					}else{
-						// TODO: Form Validation Handling
-						res.send("Error");
+						res.send({success: false, auth: true});
 					}		
 				})
+			}else{
+				res.send({success: false, auth: true});
 			}
 		});		
 	}else{
-		// TODO: Form Validation Handling
-		res.send("Error");
+		res.send({success: false, auth: true, error: errors});
 	}
 });
 

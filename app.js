@@ -5,11 +5,9 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 
 var MongoClient = require('mongodb').MongoClient;
-var mongoURL = "mongodb://127.0.0.1:27017";
 var db;
 
-var session = require('express-session');
-var MemoryStore = require('memorystore')(session);
+var config = require('./config');
 
 var app = express();
 
@@ -23,20 +21,12 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const sessionSecret = "SESSION_SECRET" in process.env ? process.env['SESSION_SECRET'] : require("crypto").randomBytes(64).toString('hex');
-app.use(session({
-	secret: sessionSecret,
-	resave: false,
-	store: new MemoryStore({
-		checkPeriod: 86400000
-	}),
-	saveUninitialized: false,
-	cookie:{
-		secure: false, //CHANGE IN PRODUCTION
-		expires: new Date(Date.now() + (60 * 30 * 1000))
-	},
-	expires: new Date(Date.now() + (60 * 30 * 1000))
-}));
+app.use(function(req, res, next) {
+	app.set('config', config);
+	next();
+});
+
+app.use(require('cors')());
 
 function route(routeName, routerLocation = null){
 	var router = require('./routes/' + (routerLocation != null ? routerLocation : routeName));
@@ -50,11 +40,11 @@ route('signin');
 route('members');
 route('events');
 route('clubs');
-route('mrfs');
+route('divisions');
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
-  next(createError(404));
+	next(createError(404));
 });
 
 // error handler
@@ -68,7 +58,7 @@ app.use(function(err, req, res, next) {
   res.render('error');
 });
 
-MongoClient.connect(mongoURL, function(error, database){
+MongoClient.connect(config.mongoURL, function(error, database){
 	if(error){
 		throw error;
 	}

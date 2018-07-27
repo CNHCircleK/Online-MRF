@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Test Page</title>
+</head>
+<body>
+	<script
+		src="https://code.jquery.com/jquery-3.3.1.min.js"
+		integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+		crossorigin="anonymous">		
+	</script>
+
+	<script>
+		var token = null;
+		$.ajax({
+			url: "http://localhost:3000/signin",
+			type: 'post',
+			data: {
+				name: "user",
+				password: "pass"
+			},
+			dataType: 'json',
+			success: function(res){
+				token = res.result;
+				console.log("Retrieved token");
+
+				$.ajax({
+					url: "http://localhost:3000/events/new",
+					type: 'post',
+					beforeSend: function(req){
+						req.setRequestHeader("Authorization", "Basic " + token);
+					},
+					dataType: 'json',
+					data:{
+						name: "Test Event!",
+						chairId: "123",
+						start: new Date(2018, 08, 01).toISOString(),
+						end: new Date(2018, 08, 01).toISOString(),
+						tags: ["5b468a319a737636ee2264fe", "5b3f125b05917c3b02dfc69b", "5b3f125b05917c3b02dfc69b"]
+					},
+					success: function(res){
+						console.log(res);
+					},
+					error: function(res){
+						console.log(res.responseText);
+					}
+				});				
+			}
+		});
+	</script>
+
+</body>
+</html>
