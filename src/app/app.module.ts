@@ -11,8 +11,7 @@ import { SidenavComponent,
 		MrfComponent, MrfListComponent,
     MyCerfsComponent, MrfSecretaryComponent, MrfDivisionComponent, MrfDistrictComponent,
 		ProfileComponent,
-    ConfirmDialogComponent } from '@app/modules/';
-
+    ConfirmDialogComponent, LoginComponent, SignupComponent } from '@app/modules/';
 import { JwtModule } from '@auth0/angular-jwt';
 export function tokenGetter() {
   return localStorage.getItem('access_token');
@@ -31,7 +30,9 @@ export function tokenGetter() {
     MrfDivisionComponent,
     MrfDistrictComponent,
     ProfileComponent,
-    ConfirmDialogComponent
+    ConfirmDialogComponent,
+    LoginComponent
+    SignupComponent
   ],
   imports: [
     BrowserModule,

@@ -1,0 +1,17 @@
+<h1> Log In </h1>
+<form class="form">
+	<p><mat-form-field>
+		<mat-label>Username</mat-label>
+		<input matInput name="Username">
+	</mat-form-field></p>
+	<p><mat-form-field>
+		<mat-label>Password</mat-label>
+		<input matInput name="Password">
+	</mat-form-field></p>
+	<p><a class="button" mat-stroked-button href='' (click)="login()">
+		Log In <i class="material-icons">done</i>
+	</a>
+	<a routerLink="/signup"><button class="button" mat-stroked-button>
+		Sign Up <i class="material-icons">add</i></button>
+	</a></p>
+</form>

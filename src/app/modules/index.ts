@@ -4,6 +4,9 @@ export * from './cerf/cerf.component';
 export * from './mrf/mrf.component';
 export * from './cerflist/cerflist.component';
 export * from './mrflist/mrflist.component';
+export * from './login/login.component';
+export * from './signup/signup.component';
+
 
 export * from './my-cerfs/my-cerfs.component';
 export * from './mrf-secretary/mrf-secretary.component';

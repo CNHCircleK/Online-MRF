@@ -8,7 +8,7 @@
   <form #accessForm="ngForm">
     <mat-form-field>
      <mat-label>Club</mat-label>
-     <input matInput name="club" [(ngModel)]="user.access.club">
+     <input matInput name="club" [(ngModel)]="user.access.club" required>
    </mat-form-field>
 
    <mat-form-field>
@@ -25,6 +25,6 @@
  </form>
 </ng-container>
 
-<a mat-button *ngIf="user" (click)="logout()" href="/" target="_self">Log out</a>
-<a mat-button *ngIf="!user" (click)="login()"  href="/" target="_self">Log in</a>
+<a mat-button *ngIf="user" (click)="logout()" href="" target="_self">Log out</a>
+<!-- <a mat-button *ngIf="!user" (click)="login()"  href="/" target="_self">Log in</a> -->
 <a mat-button (click)="resetData()">reset localhost</a>

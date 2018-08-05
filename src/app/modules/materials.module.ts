@@ -37,7 +37,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 		MatDividerModule,
 		MatDialogModule,
 		BrowserAnimationsModule
-	]
+	],
 })
 
 export class MaterialsModule { }
