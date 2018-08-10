@@ -8,7 +8,7 @@ var ObjectId = mongo.ObjectId;
 var mongoSanitize = require('express-mongo-sanitize');
 
 var bcrypt = require('bcrypt');
-var auth = require("./auth");
+var auth = require("../auth");
 
 router.all('*', function(req, res, next){
 	app = req.app;
@@ -18,8 +18,15 @@ router.all('*', function(req, res, next){
 
 router.post('/', function(req, res, next){
 	var body = req.body;
+	var errors = {};
 
-	if(utils.allIn(body, ['registration', 'email', 'username', 'password'])){
+	utils.checkIn(body, ['registration', 'email', 'username', 'password'], function(elem, res){
+		if(!res){
+			errors[elem] = "Required";
+		}
+	});
+
+	if(Object.keys(errors).length == 0){
 		var registrationId = body['registration'].substring(0, 24);
 		var secret = body['registration'].substring(24);
 
@@ -44,8 +51,7 @@ router.post('/', function(req, res, next){
 							var setData = {$set: mongoSanitize.sanitize({
 								email: body['email'],
 								username: body['username'],
-								password: hash,
-								access: member.registration.access
+								password: hash
 							})};
 
 							app.db.collection("members").updateOne(registrationQuery, setData, function(err, updateRes){
@@ -64,7 +70,7 @@ router.post('/', function(req, res, next){
 			}
 		});
 	}else{
-		res.send({success: false, auth: true, error: "Missing fields"});
+		res.send({success: false, auth: true, error: errors});
 	}
 });
 

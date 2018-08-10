@@ -67,7 +67,7 @@ MongoClient.connect(config.mongoURL, function(error, database){
 	module.exports.db = db;
 
 	console.log("MongoDB connection established");
-	app.listen(3000, function() {
+	app.listen(3000, '0.0.0.0', function() {
 		console.log("Express server listening on port 3000");
 	});
 });

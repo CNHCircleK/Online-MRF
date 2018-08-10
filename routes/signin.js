@@ -5,7 +5,7 @@ var app;
 var mongoSanitize = require('express-mongo-sanitize');
 
 var bcrypt = require('bcrypt');
-var auth = require("./auth");
+var auth = require("../auth");
 
 var utils;
 
@@ -17,6 +17,7 @@ router.all('*', function(req, res, next){
 
 router.post('/', function(req, res, next){
 	var body = req.body;
+	console.log(body);
 	var errors = {};
 
 	utils.checkIn(body, ['name', 'password'], function(elem, res){

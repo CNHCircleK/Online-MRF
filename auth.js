@@ -10,7 +10,11 @@ module.exports = {
 			club_id: member.club_id,
 			division_id: member.division_id,
 			name: member.name.first + " " + member.name.last,
-			access: member.access
+			access: {
+				club: member.access.club.level,
+				division: member.access.division.level,
+				district: member.access.district.level
+			}
 		}, app.get("config").tokenSecret, {
 			expiresIn: '1h'
 		}, function(err, token){

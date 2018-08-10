@@ -6,7 +6,7 @@ var mongo = require('mongodb');
 var ObjectId = mongo.ObjectId;
 
 var utils;
-var auth = require('./auth');
+var auth = require('../auth');
 
 var crypto = require('crypto');
 var bcrypt = require('bcrypt');
@@ -17,65 +17,39 @@ router.all('*', function(req, res, next){
 	next();
 });
 
-router.post("/new", auth.checkAuth(
+var checkMemberAccess = auth.checkAuth(
 	function(req, res, auth){
 		var user = res.locals.user;
-		auth(user.access.club > 0);
-	},
-
-	function(req, res, next){
-		var body = req.body;
-		var errors = {};
-		utils.checkIn(body, ["firstName", "lastName"], function(elem, res){
-			if(!res){
-				errors[elem] = "Required";
-			}
-		});
-
-		if(Object.keys(errors).length == 0){
-			var data = 	mongoSanitize.sanitize({
-				"name": {
-					"first": body['firstName'], 
-					"last": body['lastName']
-				},
-				"club_id": ObjectId(user.club_id),
-				"division_id": ObjectId(user.division_id)
-			});
-
-			app.db.collection("members").insertOne(data, function(err, insertRes){
-				if(err) throw err;
-				res.send({success: true, auth: true});
-			});	
-
+		if(!ObjectId.isValid(req.params.memberId)){
+			auth(false);
 		}else{
-			res.send({success: false, auth: true, error: errors});
-		}
-	}
-));
-
-router.get("/:memberId", auth.checkAuth(
-	function(req, res, auth){
-		var user = res.locals.user;
-		if(ObjectId.isValid(req.params.memberId)){
-			app.db.collection("members").findOne({"_id": ObjectId(req.params.memberId)}, function(err, memberRes){
+			var query = {"_id": ObjectId(req.params.memberId)};
+			var projection = {club_id: 1, division_id: 1, access: 1, email: 1, name: 1}
+			app.db.collection("members").findOne(query, {projection: projection}, function(err, memberRes){
 				if(err) throw err;
-				if(memberRes != null && memberRes._id == user._id || (memberRes.club_id == user.club_id && user.club_access == 1)){
+				if(memberRes != null 
+					&& memberRes._id.equals(user._id) 
+					|| (memberRes.club_id.equals(user.club_id) && user.club_access > 0)){
 					res.locals.member = memberRes;
 					auth(true);
 				}else{
 					auth(false);
 				}
-			});
-		}else{
-			auth(false);
+			});			
 		}
 	},
 
 	function(req, res, next){
-		res.send({success: true, auth: true, result: res.locals.member});
+		next();
 	}
+);
 
-));
+router.all("/:memberId", checkMemberAccess);
+router.all("/:memberId/*", checkMemberAccess);
+
+router.get("/:memberId", function(req, res, next){
+	res.send({success: true, auth: true, result: res.locals.member})
+});
 
 router.get("/:memberId/registration", auth.checkAuth(
 	function(req, res, auth){
@@ -83,8 +57,8 @@ router.get("/:memberId/registration", auth.checkAuth(
 		if(req.params.memberId != null && ObjectId.isValid(req.params.memberId)){
 			app.db.collection("members").findOne({"_id": ObjectId(req.params.memberId)}, function(err, memberRes){
 				if(err) throw err;
-				if(memberRes != null && memberRes.club_id == user.club_id && user.club_access == 1){
-					res.locals.memberData = memberRes;
+				if(memberRes != null && memberRes.club_id.equals(user.club_id) && user.club_access == 1){
+					res.locals.member = memberRes;
 					auth(true);
 				}else{
 					auth(false);
@@ -96,7 +70,7 @@ router.get("/:memberId/registration", auth.checkAuth(
 	},
 
 	function(req, res, next){
-		if(res.locals.memberData.username != null){
+		if(res.locals.member.username != null){
 			res.send({success: false, auth: true, error: "Member already has an account"});
 		}
 
@@ -107,7 +81,7 @@ router.get("/:memberId/registration", auth.checkAuth(
 
 			bcrypt.hash(secret, app.get('config').bcryptSaltRounds, function(err, hash){
 				if(err) throw err;
-				var query = {"_id": ObjectId(res.locals.memberData._id)};
+				var query = {"_id": ObjectId(res.locals.member._id)};
 				var expire = new Date();
 				expire.getDate(expire.getDate() + 14);
 

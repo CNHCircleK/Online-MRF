@@ -13,7 +13,7 @@
 	<script>
 		var token = null;
 		$.ajax({
-			url: "http://localhost:3000/signin",
+			url: "http://ec2-54-215-238-75.us-west-1.compute.amazonaws.com:3000/signin",
 			type: 'post',
 			data: {
 				name: "user",
@@ -21,30 +21,24 @@
 			},
 			dataType: 'json',
 			success: function(res){
-				token = res.result;
-				console.log("Retrieved token");
+				if(res.success){
+					token = res.result;
 
-				$.ajax({
-					url: "http://localhost:3000/events/new",
-					type: 'post',
-					beforeSend: function(req){
-						req.setRequestHeader("Authorization", "Basic " + token);
-					},
-					dataType: 'json',
-					data:{
-						name: "Test Event!",
-						chairId: "123",
-						start: new Date(2018, 08, 01).toISOString(),
-						end: new Date(2018, 08, 01).toISOString(),
-						tags: ["5b468a319a737636ee2264fe", "5b3f125b05917c3b02dfc69b", "5b3f125b05917c3b02dfc69b"]
-					},
-					success: function(res){
-						console.log(res);
-					},
-					error: function(res){
-						console.log(res.responseText);
-					}
-				});				
+					$.ajax({
+						url: "http://ec2-54-215-238-75.us-west-1.compute.amazonaws.com:3000/clubs/5b498a5b200a8f6afa46c1d0/members",
+						type: 'get',
+						beforeSend: function(req){
+							req.setRequestHeader("Authorization", "Basic " + token);
+						},
+						dataType: 'json',
+						success: function(res){
+							console.log(res);
+						},
+						error: function(res){
+							console.log(res.responseText);
+						}
+					});		
+				}		
 			}
 		});
 	</script>

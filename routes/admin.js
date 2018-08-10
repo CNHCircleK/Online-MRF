@@ -6,7 +6,7 @@ var mongo = require('mongodb');
 var ObjectId = mongo.ObjectId;
 var mongoSanitize = require('express-mongo-sanitize');
 
-var auth = require('./auth')
+var auth = require('../auth')
 var utils;
 
 router.all('*', function(req, res, next){
