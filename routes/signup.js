@@ -57,7 +57,7 @@ router.post('/', function(req, res, next){
 							app.db.collection("members").updateOne(registrationQuery, setData, function(err, updateRes){
 								if(err) throw err;
 								auth.signToken(app, member, function(err, token){
-									res.send({success: true, auth: true, token: token});
+									res.send({success: true, auth: true, result: token});
 								});
 							});
 						});

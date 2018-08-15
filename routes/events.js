@@ -17,22 +17,10 @@ router.all('*', function(req, res, next){
 	next();
 });
 
-/* 
-Types
-0: Text
-1: Number
-2: Date
-3: Email
-4: Phone Number
-5: User
-6: Club
-7: Division
-8: Event
-+100: List
-+1000: Required
-*/
-function validateFields2(club_id, data, fieldsData, callback){
-	var fieldValues = [];
+//TODO Later On
+function validateFieldsCustom(club_id, data, fieldsData, callback){
+	var validateFieldValues = [];
+
 	for(var i in fieldsData){
 		var field = fieldsData[i];
 		if(field.name in data){
@@ -40,21 +28,21 @@ function validateFields2(club_id, data, fieldsData, callback){
 				field.type -= 100;
 				if(Array.isArray(data[field.name])){
 					for(var n in data[field.name]){
-						if(fieldValues[field.type] == null){
-							fieldValues[field.type] = new Set();
+						if(validateFieldValues[field.type] == null){
+							validateFieldValues[field.type] = new Set();
 						}
 
-						fieldValues[field.type].add(data[field.name][n]);						
+						validateFieldValues[field.type].add(data[field.name][n]);						
 					}
 				}else{
-					data[field.name] = new Set();
+					data[field.name] = [];
 				}
 			}else{
-				if(fieldValues[field.type] == null){
-					fieldValues[field.type] = new Set();
+				if(validateFieldValues[field.type] == null){
+					validateFieldValues[field.type] = new Set();
 				}
 
-				fieldValues[field.type].add(data[field.name]);
+				validateFieldValues[field.type].add(data[field.name]);
 			}
 		}
 	}
@@ -254,7 +242,7 @@ router.post('/new', auth.checkAuth(
 			if(!res){
 				errors[elem] = "Required";
 			}else if(elem == "start" || elem == "end"){
-				var time = moment(body[elem], "YYYY-MM-DDTHH:mm:ssZ");
+				var time = moment(body[elem], utils.isoFormat);
 				if(time.isValid()){
 					body[elem] = time.toDate();
 				}else{
@@ -269,19 +257,20 @@ router.post('/new', auth.checkAuth(
 				division_id: res.locals.user.division_id,
 				status: 0,
 				name: body.name,
+				author_id: res.locals.user._id,
 				chair_id: res.locals.user.access.club > 0 && "chairId" in body ? null : res.locals.user._id,
 				time:{
 					start: body.start,
 					end: body.end
 				},
-				tags: utils.parseArray(body.tags) || [],
-				attendees: utils.parseArray(body.attendees) || [],
+				tags: Array.isArray(body.tags) ? body.tags : [],
+				attendees: Array.isArray(body.attendees) ? body.attendees : [],
 				hoursPerAttendee: {
-					service: !isNaN(body.service) ? parseInt(body.service) : 0,
-					leadership: !isNaN(body.leadership) ? parseInt(body.leadership) : 0,
-					fellowship: !isNaN(body.fellowship) ? parseInt(body.fellowship) : 0
+					service: !isNaN(body.service) ? parseFloat(body.service) : 0,
+					leadership: !isNaN(body.leadership) ? parseFloat(body.leadership) : 0,
+					fellowship: !isNaN(body.fellowship) ? parseFloat(body.fellowship) : 0
 				},
-				overrideHours: utils.parseArray(body.overrideHours) || [] ,
+				overrideHours: Array.isArray(body.overrideHours) ? body.overrideHours : [] ,
 				fundraised: {
 					ptp: !isNaN(body.ptp) ? parseFloat(body.ptp) : 0.0,
 					fa: !isNaN(body.fa) ? parseFloat(body.fa) : 0.0,
@@ -295,9 +284,9 @@ router.post('/new', auth.checkAuth(
 					app.db.collection("events").insertOne(data, function(err, insertRes){
 						if(err) throw err;
 						if(Object.keys(warnings).length > 0){
-							res.send({success: true, auth: true, warning: warnings});
+							res.send({success: true, auth: true, warning: warnings, result: data._id});
 						}else{
-							res.send({success: true, auth: true});
+							res.send({success: true, auth: true, result: data._id});
 						}
 						
 					});							
@@ -312,50 +301,69 @@ router.post('/new', auth.checkAuth(
 	}
 ));
 
-var checkEventAccess = auth.checkAuth(
+function checkEventAuth(projection, eventAuth, callback = null){
+	if(callback == null){
+		callback = eventAuth;
+		eventAuth = projection;
+		projection = {};
+	}
+
+	return auth.checkAuth(
+		function(req, res, auth){
+			var user = res.locals.user;
+			if(!ObjectId.isValid(req.params.eventId)){
+				auth(false);
+			}else{
+				app.db.collection("events").findOne({"_id": ObjectId(req.params.eventId)}, {projection: projection}, function(err, event){
+					if(err) throw err;
+					if(event != null){
+						res.locals.event = event;
+						eventAuth(req, res, auth);
+					}else{
+						auth(false);
+					}
+				});				
+			}
+		}, callback
+	);
+}
+
+router.get('/:eventId', checkEventAuth(
 	function(req, res, auth){
 		var user = res.locals.user;
-		if(!ObjectId.isValid(req.params.eventId)){
-			auth(false);
-		}else{
-			app.db.collection("events").findOne({"_id": ObjectId(req.params.eventId)}, function(err, event){
-				if(err) throw err;
-				if(event != null
-				 && (event.chair_id.equals(user._id) 
-				 	|| event.club_id.equals(user.club_id) 
-				 	|| event.division_id.equals(user.division_id) 
-				 	|| user.access.district == 1)){
+		var event = res.locals.event;
 
-					res.locals.event = event;
-					auth(true);
-				}else{
-					auth(false);
-				}
-			});				
+		if(event.club_id.equals(user.club_id)){
+			auth(event.author_id.equals(user._id) || user.access.club > 0);
+		}else if(event.division_id.equals(user.division_id)){
+			auth(event.status == 2 && user.access.division > 0)
+		}else{
+			auth(event.status == 2 && user.access.district > 0)
 		}
 	},
 
 	function(req, res, next){
-		next();
+		res.send(res.locals.event);
 	}
-);
+));
 
-router.all('/:eventId', checkEventAccess);
-router.all('/:eventId/*', checkEventAccess);
-
-router.get('/:eventId', function(req, res, next){
-	res.send(res.locals.event);
-});
-
-router.post('/:eventId/edit', auth.checkAuth(
+router.patch('/:eventId', checkEventAuth({author_id: 1, club_id: 1, status: 1, time: 1},
 	function(req, res, auth){
 		var user = res.locals.user;
 		var event = res.locals.event;
-		auth(event.status == 2 ? 
-			(event.club_id.equals(user.club_id) && user.access.club == 1)
-			: (event.chair_id.equals(user._id)  || (event.club_id.equals(user.club_id) && user.access.club > 0)));
 
-	}, function(req, res, next){
+		if(event.club_id.equals(user.club_id)){
+			if(user.access.club > 0){
+				auth(event.status != 2);
+			}else{
+				auth(event.status == 0 && event.author_id.equals(user._id));
+			}
+		}else{
+			auth(false);
+		}
+	}, 
+
+	function(req, res, next){
 		var body = req.body;
 		if(Object.keys(body).length > 0){
 			var errors = {};
@@ -371,14 +379,14 @@ router.post('/:eventId/edit', auth.checkAuth(
 				}else if("end" in body && !("start" in body)){
 					errors.start = "Required to be sent with end time";
 				}else{
-					var start = moment(body.start, "YYYY-MM-DDTHH:mm:ssZ");
+					var start = moment(body.start, utils.isoFormat);
 					if(start.isValid()){
 						body.start = start.toDate();
 					}else{
 						errors.start = "Invalid format";
 					}
 
-					var end = moment(body.end, "YYYY-MM-DDTHH:mm:ssZ");
+					var end = moment(body.end, utils.isoFormat);
 					if(end.isValid()){
 						body.end = end.toDate();
 					}else{
@@ -394,23 +402,23 @@ router.post('/:eventId/edit', auth.checkAuth(
 			}
 
 			if("tags" in body) 
-				data.tags = utils.parseArray(body.tags) || [];
+				data.tags = Array.isArray(body.tags) ? body.tags : [];
 			if("attendees" in body) 
-				data.attendees = utils.parseArray(body.attendees) || [];
+				data.attendees = Array.isArray(body.attendees) ? body.attendees : [];
 			if("service" in body)
-				data["hoursPerAttendee.service"] = !isNaN(body.service) ? parseInt(body.service) : 0;
+				data["hoursPerAttendee.service"] = !isNaN(body.service) ? parseFloat(body.service) : 0;
 			if("leadership" in body)
-				data["hoursPerAttendee.leadership"] = !isNaN(body.leadership) ? parseInt(body.leadership) : 0;
+				data["hoursPerAttendee.leadership"] = !isNaN(body.leadership) ? parseFloat(body.leadership) : 0;
 			if("fellowship" in body)	
-				data["hoursPerAttendee.fellowship"] = !isNaN(body.fellowship) ? parseInt(body.fellowship) : 0;			
+				data["hoursPerAttendee.fellowship"] = !isNaN(body.fellowship) ? parseFloat(body.fellowship) : 0;			
 			if("overrideHours" in body) 
-				data.overrideHours = utils.parseArray(body.overrideHours) || [];
+				data.overrideHours = Array.isArray(body.overrideHours) ? body.overrideHours : [];
 			if("ptp" in body)
-				data["fundraised.ptp"] = !isNaN(body.ptp) ? parseInt(body.ptp) : 0;
+				data["fundraised.ptp"] = !isNaN(body.ptp) ? parseFloat(body.ptp) : 0;
 			if("fa" in body)
-				data["fundraised.fa"] = !isNaN(body.fa) ? parseInt(body.fa) : 0;			
+				data["fundraised.fa"] = !isNaN(body.fa) ? parseFloat(body.fa) : 0;			
 			if("kfh" in body)
-				data["fundraised.kfh"] = !isNaN(body.kfh) ? parseInt(body.kfh) : 0;
+				data["fundraised.kfh"] = !isNaN(body.kfh) ? parseFloat(body.kfh) : 0;
 
 			if(Object.keys(errors).length == 0){
 				validateFields(res.locals.user.club_id, data, function(errors, warnings){
@@ -434,6 +442,146 @@ router.post('/:eventId/edit', auth.checkAuth(
 			}
 		}else{
 			res.send({success: true, auth: true});
+		}
+	}
+));
+
+router.delete('/:eventId', checkEventAuth({club_id: 1, author_id: 1, status: 1},
+	function(req, res, auth){
+		var user = res.locals.user;
+		var event = res.locals.event;
+
+		if(event.club_id.equals(user.club_id)){
+			if(user.access.club > 0){
+				auth(event.status != 2);
+			}else{
+				auth(event.status == 0 && event.author_id.equals(user._id));
+			}
+		}else{
+			auth(false);
+		}
+	}, 
+
+	function(req, res, next){
+		var query = {_id: res.locals.event._id};
+		app.db.collection("events").deleteOne(query, function(err, obj){
+			if(err) throw err;
+			res.send({success: true, auth: true});
+		});
+	}
+));
+
+router.patch('/:eventId/submit', checkEventAuth({club_id: 1, author_id: 1, status: 1},
+	function(req, res, auth){
+		var user = res.locals.user;
+		var event = res.locals.event;
+		if(event.club_id.equals(user.club_id)){
+			if(user.access.club > 0){
+				auth(event.status != 2);
+			}else{
+				auth(event.status == 0 && event.author_id.equals(user._id));
+			}
+		}else{
+			auth(false);
+		}
+
+	}, 
+
+	function(req, res, next){
+		var body = req.body;
+		if(Object.keys(body).length > 0){
+			if("submit" in body){
+				body.submit = 
+					body.submit === 'true' ? true
+					: body.submit === 'false' ? false
+					: body.submit;
+
+				if(body.submit === true || body.submit === false){
+					var query = {_id: res.locals.event._id};
+					var update = {$set: {status: body.submit ? 1 : 0}};
+					app.db.collection("events").updateOne(query, update, function(err, updateRes){
+						if(err) throw err;
+						res.send({success: true, auth: true});
+					});
+				}else{
+					res.send({success: false, auth: true, error: {submit: "Must be a boolean value"}});
+				}
+			}else{
+				res.send({success: false, auth: true, error: {submit: "Required"}});
+			}
+		}else{
+			res.send({success: false, auth: true, error: {submit: "Required"}});
+		}
+	}
+));
+
+router.patch('/:eventId/confirm', checkEventAuth({club_id: 1, status: 1, hoursPerAttendee: 1, attendees: 1, overrideHours: 1, "time.start": 1},
+	function(req, res, auth){
+		var user = res.locals.user;
+		var event = res.locals.event;
+
+		var editableDate = false;
+
+		var now = moment();
+		var eventTime = moment(event.time.start);
+
+		if(eventTime.diff(now) >= 0){
+			editableDate = true;
+		}else{
+			if(now.year() === eventTime.year()){
+				editableDate = now.month() - eventTime.month() < 2;
+			}else if(auth.year() === eventTime.year() + 1){
+				editableDate = now.month() === 0 && eventTime.month() === 11;
+			}
+		}
+		auth(editableDate && event.club_id.equals(user.club_id) && user.access.club > 0 && event.status > 0);
+
+	}, 
+
+	function(req, res, next){
+		var body = req.body;
+		if(Object.keys(body).length > 0){
+			if("confirm" in body){
+				body.confirm = 
+					body.confirm === 'true' ? true
+					: body.confirm === 'false' ? false
+					: body.confirm;
+					
+				if(body.confirm === true || body.confirm === false){
+					var event = res.locals.event;
+					var query = {_id: event._id};
+					var update = {$set: {status: body.confirm ? 2 : 1}};
+					if(!body.confirm){
+						update.$unset = {totals: 1};
+					}else{
+						var totals = {
+							service: event.hoursPerAttendee.service * (event.attendees.length - event.overrideHours.length),
+							leadership: event.hoursPerAttendee.leadership * (event.attendees.length - event.overrideHours.length),
+							fellowship: event.hoursPerAttendee.fellowship * (event.attendees.length - event.overrideHours.length)
+						}
+
+						for(var i in event.overrideHours){
+							totals.service += event.overrideHours[i].service;
+							totals.leadership += event.overrideHours[i].leadership;
+							totals.fellowship += event.overrideHours[i].fellowship;
+						}
+
+						totals.members = event.attendees.length;
+						update.$set.totals = totals;
+					}
+
+					app.db.collection("events").updateOne(query, update, function(err, updateRes){
+						if(err) throw err;
+						res.send({success: true, auth: true});
+					});
+				}else{
+					res.send({success: false, auth: true, error: {confirm: "Must be a boolean value"}});
+				}
+			}else{
+				res.send({success: false, auth: true, error: {confirm: "Required"}});
+			}
+		}else{
+			res.send({success: false, auth: true, error: {confirm: "Required"}});
 		}
 	}
 ));

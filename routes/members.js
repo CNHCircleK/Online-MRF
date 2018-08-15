@@ -17,56 +17,66 @@ router.all('*', function(req, res, next){
 	next();
 });
 
-var checkMemberAccess = auth.checkAuth(
+function checkMemberAuth(projection, memberAuth, callback = null){
+	if(callback == null){
+		callback = memberAuth;
+		memberAuth = projection;
+		projection = {};
+	}
+
+	return auth.checkAuth(
+		function(req, res, auth){
+			var user = res.locals.user;
+			if(!ObjectId.isValid(req.params.memberId)){
+				auth(false);
+			}else{
+				var query = {"_id": ObjectId(req.params.memberId)};
+				app.db.collection("members").findOne(query, {projection: projection}, function(err, memberRes){
+					if(err) throw err;
+					if(memberRes != null){
+						memberAuth(req, res, auth);
+					}else{
+						auth(false);
+					}
+				});			
+			}
+		}, callback
+	);
+}
+
+router.get("/:memberId", checkMemberAuth({name: 1, club_id: 1, division_id: 1, "access.club": 1, email: 1},
 	function(req, res, auth){
-		var user = res.locals.user;
-		if(!ObjectId.isValid(req.params.memberId)){
-			auth(false);
-		}else{
-			var query = {"_id": ObjectId(req.params.memberId)};
-			var projection = {club_id: 1, division_id: 1, access: 1, email: 1, name: 1}
-			app.db.collection("members").findOne(query, {projection: projection}, function(err, memberRes){
-				if(err) throw err;
-				if(memberRes != null 
-					&& memberRes._id.equals(user._id) 
-					|| (memberRes.club_id.equals(user.club_id) && user.club_access > 0)){
-					res.locals.member = memberRes;
-					auth(true);
-				}else{
-					auth(false);
-				}
-			});			
-		}
+		var member = res.locals.member;
+		auth(member.user_id.equals(user._id) || (member.club_id.equals(user.club_id) && user.club_access > 0));
 	},
 
 	function(req, res, next){
-		next();
+		res.send({success: true, auth: true, result: res.locals.member})
 	}
-);
+));
 
-router.all("/:memberId", checkMemberAccess);
-router.all("/:memberId/*", checkMemberAccess);
-
-router.get("/:memberId", function(req, res, next){
-	res.send({success: true, auth: true, result: res.locals.member})
-});
-
-router.get("/:memberId/registration", auth.checkAuth(
+router.get("/:memberId/events", checkMemberAuth({name: 1, club_id: 1},
 	function(req, res, auth){
+		var member = res.locals.member;
+		auth(member.user_id.equals(user._id) || (member.club_id.equals(user.club_id) && user.club_access > 0));
+	},
+
+	function(req, res, next){
+		var query = {author_id: res.locals.member._id};
+		var projection = {name: 1, status: 1, time: 1};
+		app.db.collection("events").find(query, {projection: projection}).toArray(function(err, events){
+			if(err) throw err;
+			res.send({success: true, auth: true, result: events});
+		});		
+	}
+
+));
+
+router.get("/:memberId/registration", checkMemberAuth({name: 1, club_id: 1, "access.club": 1},
+	function(req, res, auth){
+		var member = res.locals.member;
 		var user = res.locals.user;
-		if(req.params.memberId != null && ObjectId.isValid(req.params.memberId)){
-			app.db.collection("members").findOne({"_id": ObjectId(req.params.memberId)}, function(err, memberRes){
-				if(err) throw err;
-				if(memberRes != null && memberRes.club_id.equals(user.club_id) && user.club_access == 1){
-					res.locals.member = memberRes;
-					auth(true);
-				}else{
-					auth(false);
-				}				
-			});
-		}else{
-			auth(false);
-		}
+		auth(member.club_id.equals(user.club_id) && user.club_access >= member.access.club.level);			
 	},
 
 	function(req, res, next){

@@ -16,19 +16,35 @@
 			url: "http://ec2-54-215-238-75.us-west-1.compute.amazonaws.com:3000/signin",
 			type: 'post',
 			data: {
-				name: "user",
-				password: "pass"
+				name: "username",
+				password: "password"
 			},
 			dataType: 'json',
 			success: function(res){
 				if(res.success){
 					token = res.result;
-
 					$.ajax({
-						url: "http://ec2-54-215-238-75.us-west-1.compute.amazonaws.com:3000/clubs/5b498a5b200a8f6afa46c1d0/members",
+						url: "http://ec2-54-215-238-75.us-west-1.compute.amazonaws.com:3000/clubs/5b6d2054f176363426fe5b93/mrfs/2018/08",
 						type: 'get',
 						beforeSend: function(req){
 							req.setRequestHeader("Authorization", "Basic " + token);
+						},
+						data:{
+							goals:["I dont know"],
+							communications: {
+								ltg:{
+									message: "Hello!",
+									contacted:{
+										email: false
+									}
+								}
+							},
+							meetings:[
+								{
+									week: 3,
+									numGuests: 10
+								}
+							]
 						},
 						dataType: 'json',
 						success: function(res){

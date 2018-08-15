@@ -16,22 +16,9 @@ router.all('*', function(req, res, next){
 });
 
 router.get("/", function(req, res, next){
-	createMRF('5b498a5b200a8f6afa46c1d0', 2018, 07);
+
 	res.send("Success");
 });
-
-router.get("/divisions", auth.checkAuth(
-	function(req, res, auth){
-		auth(res.locals.user.access.district > 0);
-	},
-
-	function(req, res, next){
-		app.db.collection("divisions").find({}).toArray(function(err, divisions){
-			if(err) throw err;
-			res.send({success: true, auth: true, result: divisions});
-		});
-	}
-));
 
 router.post('/divisions/create', function(req, res, next){
 	var body = req.body;
@@ -39,13 +26,13 @@ router.post('/divisions/create', function(req, res, next){
 		var data = {"name": body['name']};
 		app.db.collection("divisions").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
 			if(err) throw err;
-			res.send("Success");
+			res.send({success: true});
 		});
 	}
 });
 
 router.get('/clubs', function(req, res, next){
-	res.send("List of clubs in district");
+	res.send({success:true});
 });
 
 router.post('/clubs/create', function(req, res, next){
@@ -100,7 +87,7 @@ router.post('/clubs/create', function(req, res, next){
 			}
 		};
 
-		app.db.collection("clubs").insertOne(mongoSanitize.sanitize(data), function(err, res){
+		app.db.collection("clubs").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
 			if(err) throw err;
 			res.send({success: true, auth: true});
 		});
@@ -129,9 +116,10 @@ router.post('/tags/create', function(req, res, next){
 	}
 });
 
-function createMRF(clubId, year, month, callback = function(){}){
+function createMRF(clubId, divisionId, year, month, callback = function(){}){
 	var data = {
 		club_id: ObjectId(clubId),
+		division_id: ObjectId(divisionId),
 		year: year,
 		month: month,
 		status: 0,
@@ -141,8 +129,9 @@ function createMRF(clubId, year, month, callback = function(){}){
 			newDuesPaid: null
 		},
 		goals: [],
-		meetings: [
-			{
+		meetings: {
+			1: {
+				date: null,
 				members: null,
 				nonHomeMembers: null,
 				kiwanis: null,
@@ -153,7 +142,8 @@ function createMRF(clubId, year, month, callback = function(){}){
 				}
 			},
 
-			{
+			2: {
+				date: null,
 				members: null,
 				nonHomeMembers: null,
 				kiwanis: null,
@@ -164,7 +154,8 @@ function createMRF(clubId, year, month, callback = function(){}){
 				}
 			},
 
-			{
+			3: {
+				date: null,
 				members: null,
 				nonHomeMembers: null,
 				kiwanis: null,
@@ -175,7 +166,8 @@ function createMRF(clubId, year, month, callback = function(){}){
 				}
 			},
 
-			{
+			4: {
+				date: null,
 				members: null,
 				nonHomeMembers: null,
 				kiwanis: null,
@@ -186,7 +178,8 @@ function createMRF(clubId, year, month, callback = function(){}){
 				}
 			},
 
-			{
+			5: {
+				date: null,
 				members: null,
 				nonHomeMembers: null,
 				kiwanis: null,
@@ -196,16 +189,16 @@ function createMRF(clubId, year, month, callback = function(){}){
 					kiwanis: null
 				}
 			}
-		],
+		},
 
 		dcm:{
 			date: null,
 			presidentAttended: null,
 			members: null,
-			nextDcmDate: null
+			nextDate: null
 		},
 
-		feedback:{
+		communications:{
 			ltg:{
 				message: null,
 				contacted:{
@@ -219,9 +212,7 @@ function createMRF(clubId, year, month, callback = function(){}){
 			dboard: null
 		},
 
-		kfamReport:{
-			completed: null
-		}
+		kfamReport: null
 	};
 
 	app.db.collection("mrfs").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
