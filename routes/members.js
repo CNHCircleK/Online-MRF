@@ -34,6 +34,7 @@ function checkMemberAuth(projection, memberAuth, callback = null){
 				app.db.collection("members").findOne(query, {projection: projection}, function(err, memberRes){
 					if(err) throw err;
 					if(memberRes != null){
+						res.locals.member = memberRes;
 						memberAuth(req, res, auth);
 					}else{
 						auth(false);
@@ -47,7 +48,8 @@ function checkMemberAuth(projection, memberAuth, callback = null){
 router.get("/:memberId", checkMemberAuth({name: 1, club_id: 1, division_id: 1, "access.club": 1, email: 1},
 	function(req, res, auth){
 		var member = res.locals.member;
-		auth(member.user_id.equals(user._id) || (member.club_id.equals(user.club_id) && user.club_access > 0));
+		var user = res.locals.user;
+		auth(member._id.equals(user._id) || (member.club_id.equals(user.club_id) && user.access.club > 0));
 	},
 
 	function(req, res, next){
@@ -58,12 +60,13 @@ router.get("/:memberId", checkMemberAuth({name: 1, club_id: 1, division_id: 1, "
 router.get("/:memberId/events", checkMemberAuth({name: 1, club_id: 1},
 	function(req, res, auth){
 		var member = res.locals.member;
-		auth(member.user_id.equals(user._id) || (member.club_id.equals(user.club_id) && user.club_access > 0));
+		var user = res.locals.user;
+		auth(member._id.equals(user._id) || (member.club_id.equals(user.club_id) && user.access.club > 0));
 	},
 
 	function(req, res, next){
 		var query = {author_id: res.locals.member._id};
-		var projection = {name: 1, status: 1, time: 1};
+		var projection = {name: 1, status: 1, time: 1, labels: 1, color: 1};
 		app.db.collection("events").find(query, {projection: projection}).toArray(function(err, events){
 			if(err) throw err;
 			res.send({success: true, auth: true, result: events});
@@ -76,7 +79,7 @@ router.get("/:memberId/registration", checkMemberAuth({name: 1, club_id: 1, "acc
 	function(req, res, auth){
 		var member = res.locals.member;
 		var user = res.locals.user;
-		auth(member.club_id.equals(user.club_id) && user.club_access >= member.access.club.level);			
+		auth(member.club_id.equals(user.club_id) && user.access.club >= member.access.club.level);			
 	},
 
 	function(req, res, next){

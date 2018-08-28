@@ -13,38 +13,22 @@
 	<script>
 		var token = null;
 		$.ajax({
-			url: "http://ec2-54-215-238-75.us-west-1.compute.amazonaws.com:3000/signin",
+			url: "http://localhost:3000/signin",
 			type: 'post',
 			data: {
-				name: "username",
+				name: "uSERNAME",
 				password: "password"
 			},
 			dataType: 'json',
 			success: function(res){
+				console.log(res);
 				if(res.success){
 					token = res.result;
 					$.ajax({
-						url: "http://ec2-54-215-238-75.us-west-1.compute.amazonaws.com:3000/clubs/5b6d2054f176363426fe5b93/mrfs/2018/08",
+						url: "http://localhost:3000/members/5b748575f9157001b756eafb",
 						type: 'get',
 						beforeSend: function(req){
 							req.setRequestHeader("Authorization", "Basic " + token);
-						},
-						data:{
-							goals:["I dont know"],
-							communications: {
-								ltg:{
-									message: "Hello!",
-									contacted:{
-										email: false
-									}
-								}
-							},
-							meetings:[
-								{
-									week: 3,
-									numGuests: 10
-								}
-							]
 						},
 						dataType: 'json',
 						success: function(res){

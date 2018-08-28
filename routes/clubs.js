@@ -76,6 +76,8 @@ router.get("/:clubId/administration", checkClubAuth({_id: 1, division_id: 1},
 
 router.patch("/:clubId/administration", checkClubAuth(
 	function(req, res, auth){
+		var club = res.locals.club;
+		var user = res.locals.user;
 		auth(club._id.equals(user.club_id) && user.access.club > 0);
 	},
 
@@ -136,6 +138,53 @@ router.get("/:clubId/members", checkClubAuth({_id: 1, division_id: 1},
 			if(err) throw err;
 			res.send({success: true, auth: true, result: members});
 		});
+	}
+));
+
+router.get("/:clubId/events", checkClubAuth({_id: 1},
+	function(req, res, auth){
+		var club = res.locals.club;
+		var user = res.locals.user;
+		auth(club._id.equals(user.club_id) && user.access.club > 0);
+	},
+
+	function(req, res, next){
+		var query = {
+			club_id: res.locals.club._id
+		};
+
+		var projection = {name: 1, time: 1, status: 1, labels: 1, color: 1};
+
+		app.db.collection("events").find(query, {projection: projection}).toArray(function(err, events){
+			if(err) throw err;
+			res.send({success: true, auth: true, result: events});
+		});	
+	}
+));
+
+router.get("/:clubId/events/status/:status", checkClubAuth({_id: 1},
+	function(req, res, auth){
+		if(utils.isInt(req.params.status)){
+			var club = res.locals.club;
+			var user = res.locals.user;
+			auth(club._id.equals(user.club_id) && user.access.club > 0);			
+		}else{
+			auth(false);
+		}
+	},
+
+	function(req, res, next){
+		var query = {
+			club_id: res.locals.club._id,
+			status: Number(req.params.status)
+		};
+
+		var projection = {name: 1, time: 1, status: 1, labels: 1, color: 1};
+
+		app.db.collection("events").find(query, {projection: projection}).toArray(function(err, events){
+			if(err) throw err;
+			res.send({success: true, auth: true, result: events});
+		});	
 	}
 ));
 
@@ -277,8 +326,8 @@ router.get("/:clubId/mrfs/:year/:month", checkClubAuth({_id: 1, division_id: 1, 
 				$lte: new Date(req.params.year, req.params.month, 1)
 			}
 		};
-		var eventProjection = {name: 1, time: 1, tags: 1, totals: 1};
 
+		var eventProjection = {name: 1, time: 1, tags: 1, totals: 1, labels: 1, color: 1};
 		app.db.collection("events").find(eventQuery, {projection: eventProjection}).toArray(function(err, events){
 			if(err) throw err;
 			mrf.events = events;
@@ -453,6 +502,18 @@ router.patch("/:clubId/mrfs/:year/:month", checkClubAuth({_id: 1, division_id: 1
 				data["kfamReport"] = utils.toBool(body.kfamReport);
 				defaults.kfamReport = data["kfamReport"];
 			}
+		}
+
+		if("labels" in body){
+			if(Array.isArray(body.labels)){
+				data["labels"] = body.labels.map(function(label){ return String(label); });
+				defaults.labels = data["labels"];
+			}
+		}
+
+		if("color" in body){
+			data["color"] = String(body.color);
+			defaults.color = data["color"];
 		}
 
 		var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};

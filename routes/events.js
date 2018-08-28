@@ -48,6 +48,7 @@ function validateFieldsCustom(club_id, data, fieldsData, callback){
 	}
 }
 
+// With database
 function validateFields(club_id, data, callback){
 	var checks = {members: false, tags: false};
 
@@ -66,10 +67,10 @@ function validateFields(club_id, data, callback){
 	var checkChair = false;
 	if("chair_id" in data){
 		if(!(data.chair_id instanceof ObjectId)){
-			if(!ObjectId.isValid(body.chairId)){
+			if(!ObjectId.isValid(data.chair_id)){
 				errors.chairId = "Unable to find user";
 			}else{
-				query.$or.push({_id: ObjectId(body.chairId)});
+				query.$or.push({_id: ObjectId(data.chair_id)});
 				checkChair = true;
 			}	
 		}
@@ -238,15 +239,26 @@ router.post('/new', auth.checkAuth(
 	function(req, res, next){
 		var body = req.body;
 		var errors = {};
-		utils.checkIn(body, ["name", "start", "end"], function(elem, res){
+		utils.checkIn(body, ["name", "time"], function(elem, res){
 			if(!res){
 				errors[elem] = "Required";
-			}else if(elem == "start" || elem == "end"){
-				var time = moment(body[elem], utils.isoFormat);
-				if(time.isValid()){
-					body[elem] = time.toDate();
+			}else if(elem == "time"){
+				if(utils.isJSON(body.time)){
+					if("start" in body.time && "end" in body.time){
+						var start = moment(body.time.start, utils.isoFormat);
+						var end = moment(body.time.end, utils.isoFormat);
+						if(!start.isValid() || !end.isValid){
+							errors.time = "Times must be in ISO Format";
+						}else if(start.diff(end) > 0){
+							errors.time = "Start time must be after end time";
+						}else{
+							body.time = {start: start.toDate(), end: end.toDate()};	
+						}
+					}else{
+						errors.time = "Must be have keys 'start' and 'end'";
+					}
 				}else{
-					errors[elem] = "Invalid";
+					errors.time = "Must be JSON";
 				}
 			}
 		});
@@ -259,10 +271,7 @@ router.post('/new', auth.checkAuth(
 				name: body.name,
 				author_id: res.locals.user._id,
 				chair_id: res.locals.user.access.club > 0 && "chairId" in body ? null : res.locals.user._id,
-				time:{
-					start: body.start,
-					end: body.end
-				},
+				time: body.time,
 				tags: Array.isArray(body.tags) ? body.tags : [],
 				attendees: Array.isArray(body.attendees) ? body.attendees : [],
 				hoursPerAttendee: {
@@ -275,7 +284,9 @@ router.post('/new', auth.checkAuth(
 					ptp: !isNaN(body.ptp) ? parseFloat(body.ptp) : 0.0,
 					fa: !isNaN(body.fa) ? parseFloat(body.fa) : 0.0,
 					kfh: !isNaN(body.kfh) ? parseFloat(body.kfh) : 0.0
-				}
+				},
+				labels: Array.isArray(body.labels) ? body.labels : [],
+				color: "color" in body ? body.color : null
 			});
 
 			data = mongoSanitize.sanitize(data);
@@ -373,31 +384,23 @@ router.patch('/:eventId', checkEventAuth({author_id: 1, club_id: 1, status: 1, t
 			if("chair_id" in body) 
 				data.chair_id = body.chair_id;
 
-			if("start" in body || "end" in body){
-				if("start" in body && !("end" in body)){
-					errors.end = "Required to be sent with start time";
-				}else if("end" in body && !("start" in body)){
-					errors.start = "Required to be sent with end time";
+			if("time" in body){
+				if(utils.isJSON(body.time)){
+					if("start" in body.time && "end" in body.time){
+						var start = moment(body.time.start, utils.isoFormat);
+						var end = moment(body.time.end, utils.isoFormat);
+						if(!start.isValid() || !end.isValid){
+							errors.time = "Times must be in ISO Format";
+						}else if(start.diff(end) > 0){
+							errors.time = "Start time must be after end time";
+						}else{
+							data.time = {start: start.toDate(), end: end.toDate()};	
+						}
+					}else{
+						errors.time = "Must be have keys 'start' and 'end'";
+					}
 				}else{
-					var start = moment(body.start, utils.isoFormat);
-					if(start.isValid()){
-						body.start = start.toDate();
-					}else{
-						errors.start = "Invalid format";
-					}
-
-					var end = moment(body.end, utils.isoFormat);
-					if(end.isValid()){
-						body.end = end.toDate();
-					}else{
-						errors.end = "Invalid format";
-					}
-
-					if(errors.start == null && errors.end == null && body.start < body.end){
-						data.time = {start: body.start, end: body.end};
-					}else{
-						errors.end = "Must be after start";
-					}			
+					errors.time = "Must be JSON";
 				}
 			}
 
@@ -419,6 +422,10 @@ router.patch('/:eventId', checkEventAuth({author_id: 1, club_id: 1, status: 1, t
 				data["fundraised.fa"] = !isNaN(body.fa) ? parseFloat(body.fa) : 0;			
 			if("kfh" in body)
 				data["fundraised.kfh"] = !isNaN(body.kfh) ? parseFloat(body.kfh) : 0;
+			if("labels" in body)
+				data["labels"] = Array.isArray(body.labels) ? body.labels : [];
+			if("color" in body)
+				data["color"] = String(body.color);
 
 			if(Object.keys(errors).length == 0){
 				validateFields(res.locals.user.club_id, data, function(errors, warnings){
@@ -475,15 +482,7 @@ router.patch('/:eventId/submit', checkEventAuth({club_id: 1, author_id: 1, statu
 	function(req, res, auth){
 		var user = res.locals.user;
 		var event = res.locals.event;
-		if(event.club_id.equals(user.club_id)){
-			if(user.access.club > 0){
-				auth(event.status != 2);
-			}else{
-				auth(event.status == 0 && event.author_id.equals(user._id));
-			}
-		}else{
-			auth(false);
-		}
+		auth(event.club_id.equals(user.club_id) && event.status != 2 && (user.access.club > 0 || event.author_id.equals(user._id)));
 
 	}, 
 
@@ -534,6 +533,7 @@ router.patch('/:eventId/confirm', checkEventAuth({club_id: 1, status: 1, hoursPe
 				editableDate = now.month() === 0 && eventTime.month() === 11;
 			}
 		}
+
 		auth(editableDate && event.club_id.equals(user.club_id) && user.access.club > 0 && event.status > 0);
 
 	}, 

@@ -68,6 +68,73 @@ router.get("/:divisionId/clubs", checkDivisionAuth({_id: 1},
 	}
 ));
 
+router.post("/:divisionId/clubs", checkDivisionAuth({_id: 1},
+	function(req, res, auth){
+		var division = res.locals.division;
+		var user = res.locals.user;
+		auth(division._id.equals(user.division_id) && user.access.division > 0);
+	},
+
+	function(req, res, next){
+		var body = req.body;
+		var errors = {};
+
+		if("name" in body){
+			errors["name"] = "Required";
+		}
+
+		if(Object.keys(errors).length == 0){
+			var data = {
+				"name": String(body['name']),
+				"division_id": res.locals.division._id,
+				"members": [],
+				"admin":{
+					"advisor": {
+						"faculty": null,
+						"kiwanis": null
+					},
+					"executive": {
+						"president": null,
+						"avp": null,
+						"svp": null,
+						"secretary": null,
+						"treasurer": null 
+					},
+					"appointed": {}
+				},
+				"goals":{
+					"service": {
+						"hours":{
+							"total": null,
+							"perMember": null
+						},
+						"fundraising": {
+							"ptp": null,
+							"fa": null,
+							"kfh": null
+						},
+						"other": []
+					},
+					"leadership": {
+						"other": []
+					},
+					"fellowship": {
+						"duesPaid": null,
+						"interclubs": null
+					}
+				}
+			};
+
+			app.db.collection("clubs").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
+				if(err) throw err;
+				res.send({success: true, auth: true, result: data._id});
+			});
+		}else{
+			res.send({success: false, auth: true, error: errors});
+		}
+	}
+));
+
 router.get("/:divisionId/mrfs", checkDivisionAuth({_id: 1},
 	function(req, res, auth){
 		var division = res.locals.division;

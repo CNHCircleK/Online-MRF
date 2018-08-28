@@ -36,64 +36,7 @@ router.get('/clubs', function(req, res, next){
 });
 
 router.post('/clubs/create', function(req, res, next){
-	var body = req.body;
-	var errors = {};
 
-	utils.checkIn(body, ['name', 'divisionId'], function(elem, res){
-		if(!res){
-			errors["elem"] = "Required";
-		}
-	});
-
-	if(Object.keys(errors).length == 0){
-		var data = {
-			"name": body['name'],
-			"division_id": ObjectId(body['divisionId']),
-			"members": [],
-			"admin":{
-				"advisor": {
-					"faculty": null,
-					"kiwanis": null
-				},
-				"executive": {
-					"president": null,
-					"avp": null,
-					"svp": null,
-					"secretary": null,
-					"treasurer": null 
-				},
-				"appointed": {}
-			},
-			"goals":{
-				"service": {
-					"hours":{
-						"total": null,
-						"perMember": null
-					},
-					"fundraising": {
-						"ptp": null,
-						"fa": null,
-						"kfh": null
-					},
-					"other": []
-				},
-				"leadership": {
-					"other": []
-				},
-				"fellowship": {
-					"duesPaid": null,
-					"interclubs": null
-				}
-			}
-		};
-
-		app.db.collection("clubs").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
-			if(err) throw err;
-			res.send({success: true, auth: true});
-		});
-	}else{
-		res.send({success: false, auth: true, error: errors});
-	}
 });
 
 router.post('/tags/create', function(req, res, next){
