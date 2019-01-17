@@ -308,11 +308,12 @@ function validateFields(club_id, data, callback){
 			for(var i = 0; i < data.drivers.length; i++){
 				var driver = data.drivers[i];
 				if(utils.isJSON(driver)){
-					if("driver" in driver && "miles" in driver){
-						if(utils.isFloat(driver.miles)){
+					if("driver" in driver && "milesTo" in driver && "milesFrom" in driver){
+						if(utils.isFloat(driver.milesTo) && utils.isFloat(driver.milesFrom)){
 							validDrivers.push({
 								driver: String(mongoSanitize.sanitize(driver.driver)), 
-								miles: parseFloat(driver.miles)
+								milesTo: parseFloat(driver.milesTo),
+								milesFrom: parseFloat(driver.milesFrom)
 							});
 
 						}else{

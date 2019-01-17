@@ -31,7 +31,7 @@
 						},
 						dataType: 'json',
 						data: {
-							name: "name",
+							name: "Event Name",
 							chair_id: "5c3ff95dc6a26d70b3be4623", 
 							time: {
 								start: new Date(), 
@@ -39,29 +39,35 @@
 							},
 							location: "location",
 							contact: "contact",
-							tags: ["5b3f125b05917c3b02dfc69c", "eee"],
-							attendees: ["5c3ff95bc6a26d70b3be4621", "ddd", "5c3ff95dc6a26d70b3be4623", "5c3ff95dc6a26d70b3be4643"],
+							tags: ["5b3f125b05917c3b02dfc69b"],
+							attendees: ["5c3ff95bc6a26d70b3be4621", "5c3ff95dc6a26d70b3be4623", "5c3ff95dc6a26d70b3be4643"],
 							hoursPerAttendee: {
 								service: 3.1,
 								leadership: 4.2,
 								fellowship: 5.3
 							},
 							overrideHours: [
-							{"attendee_id": "5c3ff95dc6a26d70b3be4623", service: 100, leadership: 101, fellowship: 102},{"attendee_id": "5b498a5b200a8f6afa46c1sadasd0", service: 100, leadership: 101, fellowship: 102}],
+								{"attendee_id": "5c3ff95dc6a26d70b3be4623", service: 100, leadership: 101, fellowship: 102},
+								{"attendee_id": "5b498a5b200a8f6afa46c1sadasd0", service: 100, leadership: 101, fellowship: 102}
+							],
 							fundraised: {
 								amountRaised: 10.4,
 								amountSpent: 20.4,
 								usedFor: "Usedfor"
 							},
-							categories: ["Test1", "Test2", "Test3", "<script><\/script>"],
+							categories: ["Test1", "Test2", "Test3"],
 							comments: {
 								summary: "sum",
 								strengths: "str",
 								weaknesses: "weak",
 								improvements: "impr"
 							},
-							drivers: [{"driver": "5b498a5b200a8f6afa46c1d0", miles: 3.3}],
-							kfamAttendance: [{org: "Castro Valley Key Club", numAttendees: 3}]
+							drivers: [
+								{"driver": "Bob", miles: 3.3}
+							],
+							kfamAttendance: [
+								{org: "School Key Club", numAttendees: 3}
+							]
 						},
 						success: function(res){
 							console.log(res);
