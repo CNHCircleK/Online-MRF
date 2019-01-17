@@ -17,7 +17,6 @@ router.all('*', function(req, res, next){
 
 router.post('/', function(req, res, next){
 	var body = req.body;
-	console.log(body);
 	var errors = {};
 
 	utils.checkIn(body, ['name', 'password'], function(elem, res){
@@ -27,7 +26,7 @@ router.post('/', function(req, res, next){
 	});
 
 	if(Object.keys(errors).length == 0){
-		var query = {$or:[mongoSanitize.sanitize({username: "/^" + body['name'] + "$/i"}), mongoSanitize.sanitize({email: "/^" + body['name'] + "$/i"}) ]};
+		var query = {$or:[{username: {$regex: "^" + String(mongoSanitize.sanitize(body['name'])) + "$", $options: "i"}}, {email: {$regex: "^" + String(mongoSanitize.sanitize(body['name'])) + "$", $options: "i"}}]};
 		var projection = {name: 1, club_id: 1, division_id: 1, access: 1};
 
 		app.db.collection("members").findOne(query, projection, function(err, member){

@@ -1,0 +1,439 @@
+Documentation
+------------------------------------------------------------------------------------------------------------------------
+/clubs/{clubId}/administration
+get
+Returns a list of board members with their access levels
+{
+	auth: true,
+	success: true,
+	result: [
+		{
+			_id: "ObjectId",
+			name: {
+				first: "string",
+				last: "string"
+			},
+			email: "string",
+			access: {
+				club: {
+					level: 0,
+					position: "string"
+				}
+			}
+		}
+	]
+} 
+------------------------------------------------------------------------------------------------------------------------
+/clubs/{clubId}/administration
+patch
+Edits club access for an individual
+{
+	auth: true,
+	success: true
+}
+
+{
+	memberId: "ObjectId",
+	access: 0
+	position: "string"
+}
+------------------------------------------------------------------------------------------------------------------------
+/clubs/{clubId}/members
+get 
+Returns a list of members in club
+{
+	auth: true,
+	success: true,
+	result: [
+		{
+			_id: "ObjectId",
+			name: {
+				first: "string",
+				last: "string"
+			},
+			access: {
+				club: {
+					level: 0,
+					position: "string"
+				}
+			}
+		}
+	]
+} 
+------------------------------------------------------------------------------------------------------------------------
+/clubs/{clubId}/events
+get 
+Gets list of events
+{
+	auth: true,
+	success: true,
+	result: [
+		{
+			_id: "ObjectId",
+			name: "string",
+			status: 0,
+			tags: ["ObjectId"]
+			time: {
+				start: "ISOString",
+				end: "ISOString"
+			}
+		}
+	]
+} 
+------------------------------------------------------------------------------------------------------------------------
+/clubs/{clubId}/events/status/{status}
+get
+Gets list of events with a particular status
+{
+	auth: true,
+	success: true,
+	result: [
+		{
+			_id: "ObjectId",
+			name: "string",
+			tags: ["ObjectId"]
+			time: {
+				start: "ISOString",
+				end: "ISOString"
+			}
+		}
+	]
+}
+------------------------------------------------------------------------------------------------------------------------
+/clubs/{clubId}/members
+post
+Adds a new member to roster (TODO: Change to adding multiple members)
+{
+	auth: true,
+	success: true
+}
+
+{
+	name: {
+		first: "string",
+		last: "string"
+	}
+}
+------------------------------------------------------------------------------------------------------------------------
+/clubs/{clubId}/goals
+get
+FIX
+------------------------------------------------------------------------------------------------------------------
+/clubs/{clubId}/mrfs/{year}/{month}
+get 
+Return MRF information for year and month
+Implement updates
+{
+	auth: true,
+	success: true,
+	result: {
+		status: 0,
+		submissionTime: "ISOString",
+		communications: {
+			ltg: {
+				message: "string",
+				contacted: {
+					email: true,
+					newsletter: true,
+					phone: true,
+					visit: true,
+					other: true
+				}
+			}
+			dboard: "string"
+		},
+		dcm: {
+			date: "ISOString",
+			nextDate: "ISOString",
+			numMembers: 0,
+			presidentAttended: true
+		},
+		events: [
+			{
+				_id: "ObjectId",
+				name: "string",
+				tags: ["ObjectId"]
+				time: {
+					start: "ISOString",
+					end: "ISOString"
+				}
+			}
+		],
+		goals: ["string"],
+		kfamReport: true,
+		meetings: [
+			{
+				date: "ISOString",
+				numMembers: 0,
+				numGuests: 0,
+				numKiwanis: 0,
+				numNonHomeMembers: 0,
+				advisorAttendance: {
+					faculty: true,
+					kiwanis: true
+				},				
+			}
+		],
+		updates: {
+			duesPaid: 0,
+			newDuesPaid: 0
+		}
+	}
+}
+------------------------------------------------------------------------------------------------------------------
+/clubs/{clubId}/mrfs/{year}/{month}
+patch
+Edits a detail for year and month mrf
+{
+	communications: {
+		ltg: {
+			message: "string",
+			contacted: {
+				email: true,
+				newsletter: true,
+				phone: true,
+				visit: true,
+				other: true
+			}
+		}
+		dboard: "string"
+	},
+	dcm: {
+		date: "ISOString",
+		nextDate: "ISOString",
+		numMembers: 0,
+		presidentAttended: true
+	},
+	goals: ["string"],
+	kfamReport: true,
+	meetings: [
+		{
+			week: 1,
+			date: "ISOString",
+			numMembers: 0,
+			numGuests: 0,
+			numKiwanis: 0,
+			numNonHomeMembers: 0,
+			advisorAttendance: {
+				faculty: true,
+				kiwanis: true
+			},				
+		}
+	],
+	updates: {
+		duesPaid: 0,
+		newDuesPaid: 0
+	}
+}
+------------------------------------------------------------------------------------------------------------------
+/divisions/{divisionId}/clubs
+get
+Gets a list of clubs
+{
+	auth: true,
+	success: true,
+	result: [
+		{
+			_id: "ObjectId",
+			name: "string"
+		}
+	]	
+}
+------------------------------------------------------------------------------------------------------------------
+/divisions/{divisionId}/clubs
+post
+Creates a new club in the division
+{
+	name: "string"
+}
+------------------------------------------------------------------------------------------------------------------
+/divisions/mrfs
+get
+Fix
+------------------------------------------------------------------------------------------------------------------
+/district/divisions
+get
+Get list of divisions
+{
+	auth: true,
+	success: true,
+	result: [
+		{
+			_id: "ObjectId",
+			name: "string"
+		}
+	]
+}
+------------------------------------------------------------------------------------------------------------------
+/district/tags
+get
+{
+	auth: true,
+	success: true,
+	result: [
+		{
+			_id: "ObjectId",
+			abbrev: "string",
+			name: "string"
+		}
+	]	
+}
+------------------------------------------------------------------------------------------------------------------
+/district/tags
+post
+{
+	auth: true,
+	success: true	
+}
+
+{
+	abbrev: "string",
+	name: "string"
+}
+------------------------------------------------------------------------------------------------------------------
+/district/tags/{tagId}
+patch
+{
+	auth: true,
+	success: true	
+}
+
+{
+	abbrev: "string",
+	name: "string",
+	active: true
+}
+------------------------------------------------------------------------------------------------------------------
+/district/mrfs
+get
+TODO
+------------------------------------------------------------------------------------------------------------------
+/events/{eventId}
+get
+Get event information
+
+{
+	_id: "ObjectId",
+	name: "string",
+	status: 0,
+	tags: ["ObjectId"],
+	time:{
+		start: "ISOString",
+		end: "ISOString"
+	}
+	attendees: ["ObjectId"],
+	author_id: "ObjectId",
+	chair_id: "ObjectId",
+	club_id: "ObjectId",
+	division_id: "ObjectId",
+	fundraised: {
+		ptp: 0,
+		fa: 0,
+		kfh: 0
+	},
+	hoursPerAttendee: {
+		service: 0,
+		leadership: 0,
+		fellowship: 0
+	},
+	overrideHours: [
+		{
+			attendee: "ObjectId or string",
+			service: 0,
+			leadership: 0,
+			fellowship: 0
+		}
+	]
+}
+------------------------------------------------------------------------------------------------------------------
+/events/{eventId}
+patch
+{
+	auth: true,
+	success: true	
+}
+------------------------------------------------------------------------------------------------------------------
+/events/
+post
+TODO Fix submission
+{
+	auth: true,
+	success: true	
+}
+------------------------------------------------------------------------------------------------------------------
+/events/{eventId}
+delete
+{
+	auth: true,
+	success: true	
+}
+------------------------------------------------------------------------------------------------------------------
+/events/{eventId}/submit
+patch
+{
+	auth: true,
+	success: true	
+}
+
+{
+	submit: true
+}
+------------------------------------------------------------------------------------------------------------------
+/events/{eventId}/confirm
+patch
+{
+	auth: true,
+	success: true	
+}
+
+{
+	confirm: true
+}
+------------------------------------------------------------------------------------------------------------------
+/members/{memberId}
+get
+{
+	auth: true,
+	success: true,
+	result: {
+		name: {
+			first: "string",
+			last: "string"
+		},
+		club_id: "ObjectId",
+		division_id: "ObjectId",
+		email: "string",
+		club: {
+			level: 0,
+			position: "string"
+		}
+	}
+}
+------------------------------------------------------------------------------------------------------------------
+/members/{memberId}/events
+get
+
+------------------------------------------------------------------------------------------------------------------
+/members/{memberId}/registration
+get
+{
+	auth: true,
+	success: true,
+	result: "string"
+}
+------------------------------------------------------------------------------------------------------------------
+/signin/
+post
+{
+	auth: true,
+	success: true,
+	result: "string"
+}
+------------------------------------------------------------------------------------------------------------------
+/signup/
+post
+{
+	auth: true,
+	success: true,
+	result: "string"
+}

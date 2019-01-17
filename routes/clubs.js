@@ -116,13 +116,17 @@ router.patch("/:clubId/administration", checkClubAuth(
 	}
 ));
 
+var regEscape = function(s) {
+    return s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+};
+
 router.get("/:clubId/members", checkClubAuth({_id: 1, division_id: 1},
 	function(req, res, auth){
 		var club = res.locals.club;
 		var user = res.locals.user;
 
 		if(club._id.equals(user.club_id)){
-			auth(user.access.club > 0);
+			auth(true);
 		}else if(club.division_id.equals(user.division_id)){
 			auth(user.access.division > 0);
 		}else{
@@ -131,8 +135,27 @@ router.get("/:clubId/members", checkClubAuth({_id: 1, division_id: 1},
 	},
 
 	function(req, res, next){
+		if("query" in req){
+			if("search" in req.query){
+				var search = regEscape(req.query.search);
+				if(search.length >= 3){
+					var query = {club_id: res.locals.club._id, $or: [{"name.first": new RegExp(search, "i")}, {"name.last": new RegExp(search, "i")}]};
+					var projection = {name: 1, email: 1};
+
+					app.db.collection("members").find(query, {projection: projection}).toArray(function(err, members){
+						if(err) throw err;
+						res.send({success: true, auth: true, result: members});
+					});
+				}else{
+					res.send({success: false, auth: true, error: {search: "Search query of at least length of three required"}});
+				}
+
+				return;
+			}
+		}
+
 		var query = {club_id: res.locals.club._id};
-		var projection = {name: 1, "access.club": 1};
+		var projection = {name: 1, email: 1};
 
 		app.db.collection("members").find(query, {projection: projection}).toArray(function(err, members){
 			if(err) throw err;
@@ -149,11 +172,40 @@ router.get("/:clubId/events", checkClubAuth({_id: 1},
 	},
 
 	function(req, res, next){
+		var body = req.query;
 		var query = {
-			club_id: res.locals.club._id
+			$and: [{club_id: res.locals.club._id}]
 		};
 
-		var projection = {name: 1, time: 1, status: 1, labels: 1, color: 1};
+		// TODO Add more 
+		if("status" in body) {
+			if(Array.isArray(body.status)){
+				var or = [];
+				for(var i in body.status){
+					var status = body.status[i];
+					if(utils.isInt(status)){
+						or.push({status: parseInt(status)});
+					}else{
+						res.send({success: true, auth: true, result: []});
+						return;
+					}
+					
+				}
+
+				query.$and.push({$or: or});
+			}else{
+				if(utils.isInt(body.status)){
+					body.status = parseInt(body.status);
+					query.$and.push({status: body.status});	
+				}else{
+					res.send({success: true, auth: true, result: []});
+					return;
+				}
+				
+			}
+		}
+
+		var projection = {name: 1, time: 1, status: 1, categories: 1, tags: 1};
 
 		app.db.collection("events").find(query, {projection: projection}).toArray(function(err, events){
 			if(err) throw err;
@@ -179,7 +231,7 @@ router.get("/:clubId/events/status/:status", checkClubAuth({_id: 1},
 			status: Number(req.params.status)
 		};
 
-		var projection = {name: 1, time: 1, status: 1, labels: 1, color: 1};
+		var projection = {name: 1, time: 1, categories: 1, tags: 1};
 
 		app.db.collection("events").find(query, {projection: projection}).toArray(function(err, events){
 			if(err) throw err;
@@ -188,7 +240,7 @@ router.get("/:clubId/events/status/:status", checkClubAuth({_id: 1},
 	}
 ));
 
-router.post("/:clubId/members/new", checkClubAuth({_id: 1, division_id: 1},
+router.post("/:clubId/members", checkClubAuth({_id: 1, division_id: 1},
 	function(req, res, auth){
 		auth(res.locals.user.access.club > 0);
 	},
@@ -196,17 +248,23 @@ router.post("/:clubId/members/new", checkClubAuth({_id: 1, division_id: 1},
 	function(req, res, next){
 		var body = req.body;
 		var errors = {};
-		utils.checkIn(body, ["firstName", "lastName"], function(elem, res){
+		utils.checkIn(body, ["name"], function(elem, res){
 			if(!res){
 				errors[elem] = "Required";
+			}else{
+				if(utils.isJSON(body.name)){
+					if(!("first" in body.name && "last" in body.name)){
+						errors[elem] = "Required";
+					}
+				}
 			}
 		});
 
 		if(Object.keys(errors).length == 0){
 			var data = 	mongoSanitize.sanitize({
 				name: {
-					first: body['firstName'], 
-					last: body['lastName']
+					first: body.name.first, 
+					last: body.name.last
 				},
 				club_id: res.locals.club._id,
 				division_id: res.locals.club.division_id,
@@ -225,7 +283,7 @@ router.post("/:clubId/members/new", checkClubAuth({_id: 1, division_id: 1},
 
 			app.db.collection("members").insertOne(data, function(err, insertRes){
 				if(err) throw err;
-				res.send({success: true, auth: true});
+				res.send({success: true, auth: true, result: data._id});
 			});	
 
 		}else{
@@ -288,7 +346,8 @@ router.get("/:clubId/mrfs/:year/:month", checkClubAuth({_id: 1, division_id: 1, 
 					|| (user.access.district > 0)){
 
 					var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};
-					app.db.collection("mrfs").findOne(query, function(err, mrf){
+					var mrfProjection = {communications: 1, dcm: 1, events: 1, goals: 1, kfamReport: 1, meetings: 1, status: 1, submissionTime: 1, updates: 1};
+					app.db.collection("mrfs").findOne(query, {projection: mrfProjection}, function(err, mrf){
 						if(mrf != null){
 							if(mrf.status > 0 || (club._id.equals(user.club_id) && user.access.club > 0)){
 								res.locals.mrf = mrf;
@@ -305,12 +364,12 @@ router.get("/:clubId/mrfs/:year/:month", checkClubAuth({_id: 1, division_id: 1, 
 							}
 						}
 					});
+				}else{
+					auth(false);
 				}
-					
 			}else{
 				auth(false);
 			}
-
 		}else{
 			auth(false);
 		}
@@ -327,10 +386,12 @@ router.get("/:clubId/mrfs/:year/:month", checkClubAuth({_id: 1, division_id: 1, 
 			}
 		};
 
-		var eventProjection = {name: 1, time: 1, tags: 1, totals: 1, labels: 1, color: 1};
+		var eventProjection = {name: 1, time: 1, tags: 1, totals: 1, labels: 1};
 		app.db.collection("events").find(eventQuery, {projection: eventProjection}).toArray(function(err, events){
 			if(err) throw err;
 			mrf.events = events;
+			delete mrf["club_id"]
+			delete mrf["division_id"]
 			res.send({success: true, auth: true, result: mrf});
 		});			
 	}
@@ -509,11 +570,6 @@ router.patch("/:clubId/mrfs/:year/:month", checkClubAuth({_id: 1, division_id: 1
 				data["labels"] = body.labels.map(function(label){ return String(label); });
 				defaults.labels = data["labels"];
 			}
-		}
-
-		if("color" in body){
-			data["color"] = String(body.color);
-			defaults.color = data["color"];
 		}
 
 		var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};

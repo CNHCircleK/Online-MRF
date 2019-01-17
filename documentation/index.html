@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Online MRF Documentation</title>
+	<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+	<div class="endpoint">
+		<div class="preview">
+			<div class="type patch"></div>
+			<div class="content">
+				<span class="uri">/clubs/<span class="variable">{clubId}</span>/administration</span>
+				<span class="description">Edits a member's access and position in the club <span class="variable">{clubId}</span></span>
+			</div>
+		</div>
+
+		<div class="details">
+			<div class="return">
+				<div class="info-type">Returns</div>
+				<div class="table">
+					<div class="headers">
+						<div>Name</div>
+						<div>Data Type</div>
+						<div>Example</div>
+					</div>
+
+					<div class="argument">
+						<div>success</div>
+						<div>Boolean</div>
+						<div>true</div>
+					</div>
+
+					<div class="argument">
+						<div>auth</div>
+						<div>Boolean</div>
+						<div>true</div>
+					</div>
+
+					<div class="argument">
+						<div>error (optional)</div>
+						<div>Dict[string->string]</div>
+						<div>true</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="parameters">
+				<div class="info-type">Parameters</div>
+				<div class="table">
+					<div class="headers">
+						<div>Name</div>
+						<div>Data Type</div>
+						<div>Example</div>
+					</div>
+
+					<div class="argument">
+						<div>memberId</div>
+						<div>ObjectId</div>
+						<div>Argument Example</div>
+					</div>
+
+					<div class="argument">
+						<div>access</div>
+						<div>Integer</div>
+						<div>1</div>
+					</div>
+
+					<div class="argument">
+						<div>position</div>
+						<div>String</div>
+						<div>Technology Chair</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

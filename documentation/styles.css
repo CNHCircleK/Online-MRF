@@ -1,0 +1,148 @@
+html{
+	font-family: Roboto;
+	font-size: 14px;
+	color: #333333;
+}
+
+.variable{
+	font-style: italic;
+}
+
+.endpoint{
+	width: 100%;
+}
+
+.endpoint .preview{
+	display: table;
+	border-radius: 5px;
+	width: 100%;
+	table-layout: fixed;
+}
+
+.endpoint .preview > * {
+	display: table-cell;
+	padding: 7px 0px;
+}
+
+.endpoint .preview .type{
+	color: white;
+	text-align: center;
+	font-weight: bold;
+	width: 75px;	
+	border-top-left-radius: 3px;
+	border-bottom-left-radius: 3px;
+	border: 1px solid #B3B3B3;
+}
+
+.endpoint .preview .type.get{
+	background-color: #00E601;
+
+}
+
+.endpoint .preview .type.get::before{
+	content: "GET";
+}
+
+.endpoint .preview .type.post{
+	background-color: #00AAFF;
+}
+
+.endpoint .preview .type.post::before{
+	content: "POST";
+}
+
+.endpoint .preview .type.patch{
+	background-color: #9400FF;
+}
+
+.endpoint .preview .type.patch::before{
+	content: "PATCH";
+}
+
+.endpoint .preview .type.delete{
+	background-color: #F20000;
+}
+
+.endpoint .preview .type.delete::before{
+	content: "DELETE";
+}
+
+.endpoint .preview .content {
+	padding-left: 10px;
+	border: 1px solid #B3B3B3;
+	border-left: 0;
+	border-top-right-radius: 3px;
+	border-bottom-right-radius: 3px;
+	background-color: #F7F7F7;
+}
+
+.endpoint .preview .content .uri{
+	font-weight: bold;
+}
+
+.endpoint .preview .content .description{
+	color: #666666;
+	padding-left: 30px;
+}
+
+.endpoint .details{
+	border: 1px solid #B3B3B3;
+	border-top: 0;
+	padding: 10px 20px;
+}
+
+.endpoint .details > *{
+	padding-bottom: 20px;
+}
+
+.endpoint .details .info-type{
+	font-weight: bold;
+	font-size: 1.5rem;
+	padding-bottom: 3px;
+}
+
+.endpoint .details .table{
+	display: table;
+	width: 100%;
+	padding-top: 5px;
+	table-layout: fixed;
+}
+
+.endpoint .details .table > * > *{
+	padding: 10px 15px;
+	width: 33.3333%;
+}
+
+.endpoint .details .table .headers{
+	display: table-row;
+	font-weight: bold;
+}
+
+.endpoint .details .table .headers > *:first-child{
+	border-left: 1px solid #B3B3B3;
+}
+
+.endpoint .details .table .headers > *:last-child{
+	border-right: 1px solid #B3B3B3;
+}
+
+.endpoint .details .table .headers > *{
+	display: table-cell;
+	background-color: #F7F7F7;
+
+	border-top: 1px solid #B3B3B3;
+	border-bottom: 1px solid #B3B3B3;
+}
+
+.endpoint .details .table .argument{
+	display: table-row;
+}
+
+.endpoint .details .table .argument > *{
+	display: table-cell;
+	border-bottom: 1px solid #B3B3B3;
+}
+
+.endpoint .details .table .argument:last-child > *{
+	border-bottom: 0;
+}

@@ -17,301 +17,6 @@ router.all('*', function(req, res, next){
 	next();
 });
 
-//TODO Later On
-function validateFieldsCustom(club_id, data, fieldsData, callback){
-	var validateFieldValues = [];
-
-	for(var i in fieldsData){
-		var field = fieldsData[i];
-		if(field.name in data){
-			if(field.type >= 100){
-				field.type -= 100;
-				if(Array.isArray(data[field.name])){
-					for(var n in data[field.name]){
-						if(validateFieldValues[field.type] == null){
-							validateFieldValues[field.type] = new Set();
-						}
-
-						validateFieldValues[field.type].add(data[field.name][n]);						
-					}
-				}else{
-					data[field.name] = [];
-				}
-			}else{
-				if(validateFieldValues[field.type] == null){
-					validateFieldValues[field.type] = new Set();
-				}
-
-				validateFieldValues[field.type].add(data[field.name]);
-			}
-		}
-	}
-}
-
-// With database
-function validateFields(club_id, data, callback){
-	var checks = {members: false, tags: false};
-
-	var errors = {};
-	var warnings = {};
-
-	var tryCallback = function(){
-		if(checks.members && checks.tags){
-			callback(errors, warnings); 
-		}
-	}
-
-	var query = {club_id: club_id, $or:[]};
-	var projection = {_id: 1};
-
-	var checkChair = false;
-	if("chair_id" in data){
-		if(!(data.chair_id instanceof ObjectId)){
-			if(!ObjectId.isValid(data.chair_id)){
-				errors.chairId = "Unable to find user";
-			}else{
-				query.$or.push({_id: ObjectId(data.chair_id)});
-				checkChair = true;
-			}	
-		}
-	}
-
-	var verifiedAttendees = [];
-	var unverifiedAttendees = [];
-	var attendeeIndices = {};
-	if("attendees" in data){
-		if(Array.isArray(data.attendees)){
-			for(var i in data.attendees){
-				var attendee = data.attendees[i];
-				if(ObjectId.isValid(attendee)){
-					if(!(attendee in attendeeIndices)){
-						attendeeIndices[attendee] = i;
-						query.$or.push({_id: ObjectId(attendee)});
-					}
-				}else{
-					unverifiedAttendees.push(attendee);
-				}
-			}
-		}else{
-			data.attendees = [];
-		}
-	}
-
-	var verifiedOverrideHours = [];
-	var unverifiedOverrideHours = [];
-	var overrideAttendeeIndices = {};
-	if("overrideHours" in data){
-		if(Array.isArray(data.overrideHours)){
-			for(var i in data.overrideHours){
-				var override = data.overrideHours[i];
-				if(override.constructor == Object){
-					if("attendee" in override 
-						&& "service" in override && !isNaN(override.service)
-						&& "leadership" in override && !isNaN(override.leadership)
-						&& "fellowship" in override && !isNaN(override.fellowship)){
-						if(ObjectId.isValid(override.attendee)){
-							if(!(String(override.attendee) in overrideAttendeeIndices)){
-								override.attendee = ObjectId(override.attendee);
-								overrideAttendeeIndices[String(override.attendee)] = i;
-								query.$or.push({_id: ObjectId(override.attendee)});
-							}
-						}else{
-							unverifiedOverrideHours.push(override);
-						}
-					}
-				}
-			}			
-		}else{
-			data.overrideHours = [];
-		}		
-	}
-
-	if(query.$or.length > 0){
-		app.db.collection("members").find(query, {projection: projection}).toArray(function(err, members){
-			if(err) throw err;
-			for(var i in members){
-				var member = members[i];
-				if(String(member._id) in attendeeIndices){
-					verifiedAttendees.push(member._id);
-				}
-
-				if(String(member._id) in overrideAttendeeIndices){
-					verifiedOverrideHours.push(data.overrideHours[overrideAttendeeIndices[String(member._id)]]);
-				}
-
-				if(checkChair){
-					if(String(member._id) == data.chair_id){
-						data.chair_id = member._id;
-					}else{
-						data.chair_id = null;
-					}
-				}
-			}
-
-			if(checkChair && data.chair_id === null){
-				errors.chairId = "Unable to find user";
-			}
-
-			if("attendees" in data){
-				if(verifiedAttendees.length + unverifiedAttendees.length != data.attendees.length){
-					if(!("attendees" in warnings)){
-						warnings.attendees = "Some attendees are unable to be added";
-					}
-				}
-				data.attendees = verifiedAttendees;
-				if(unverifiedAttendees.length > 0){
-					data.unverifiedAttendees = unverifiedAttendees;
-				}
-			}
-			
-			if("overrideHours" in data){
-				if(verifiedOverrideHours.length + unverifiedOverrideHours.length != data.overrideHours.length){
-					if(!("overrideHours" in warnings)){
-						warnings.overrideHours = "Some override hours were unable to be set";
-					}
-				}
-
-				data.overrideHours = verifiedOverrideHours;
-				if(unverifiedOverrideHours.length > 0){
-					data.unverifiedOverrideHours = unverifiedOverrideHours;
-				}
-			}
-			
-			checks.members = true;
-			tryCallback();
-		});	
-	}else{
-		if("attendees" in data){
-			data.attendees = verifiedAttendees;
-			if(unverifiedAttendees.length > 0){
-				data.unverifiedAttendees = unverifiedAttendees;
-			}
-		}
-		
-		if("overrideHours" in data){
-			data.overrideHours = verifiedOverrideHours;
-			if(unverifiedOverrideHours.length > 0){
-				data.unverifiedOverrideHours = unverifiedOverrideHours;
-			}			
-		}
-
-		checks.members = true;
-		tryCallback();
-	}
-
-	if("tags" in data){
-		if(Array.isArray(data.tags)){
-			if(data.tags.length > 0){
-				var tagQuery = {$or: []};
-				data.tags.forEach(function(elem){
-					if(ObjectId.isValid(elem)){
-						tagQuery.$or.push({_id: ObjectId(elem)});
-					}
-				});
-
-				var projection = {_id: 1};
-				app.db.collection("tags").find(tagQuery, {projection: projection}).toArray(function(err, tags){
-					if(err) throw err;
-					data.tags = [];
-					tags.forEach(function(elem){
-						data.tags.push(elem._id);
-					});
-
-					checks.tags = true;
-					tryCallback();
-				});
-			}else{
-				checks.tags = true;
-				tryCallback();
-			}			
-		}
-	}else{
-		checks.tags = true;
-		tryCallback();		
-	}
-}
-
-router.post('/new', auth.checkAuth(
-	function(req, res, auth){
-		auth(true);
-	},
-
-	function(req, res, next){
-		var body = req.body;
-		var errors = {};
-		utils.checkIn(body, ["name", "time"], function(elem, res){
-			if(!res){
-				errors[elem] = "Required";
-			}else if(elem == "time"){
-				if(utils.isJSON(body.time)){
-					if("start" in body.time && "end" in body.time){
-						var start = moment(body.time.start, utils.isoFormat);
-						var end = moment(body.time.end, utils.isoFormat);
-						if(!start.isValid() || !end.isValid){
-							errors.time = "Times must be in ISO Format";
-						}else if(start.diff(end) > 0){
-							errors.time = "Start time must be after end time";
-						}else{
-							body.time = {start: start.toDate(), end: end.toDate()};	
-						}
-					}else{
-						errors.time = "Must be have keys 'start' and 'end'";
-					}
-				}else{
-					errors.time = "Must be JSON";
-				}
-			}
-		});
-
-		if(Object.keys(errors).length == 0){
-			var data = mongoSanitize.sanitize({
-				club_id: res.locals.user.club_id,
-				division_id: res.locals.user.division_id,
-				status: 0,
-				name: body.name,
-				author_id: res.locals.user._id,
-				chair_id: res.locals.user.access.club > 0 && "chairId" in body ? null : res.locals.user._id,
-				time: body.time,
-				tags: Array.isArray(body.tags) ? body.tags : [],
-				attendees: Array.isArray(body.attendees) ? body.attendees : [],
-				hoursPerAttendee: {
-					service: !isNaN(body.service) ? parseFloat(body.service) : 0,
-					leadership: !isNaN(body.leadership) ? parseFloat(body.leadership) : 0,
-					fellowship: !isNaN(body.fellowship) ? parseFloat(body.fellowship) : 0
-				},
-				overrideHours: Array.isArray(body.overrideHours) ? body.overrideHours : [] ,
-				fundraised: {
-					ptp: !isNaN(body.ptp) ? parseFloat(body.ptp) : 0.0,
-					fa: !isNaN(body.fa) ? parseFloat(body.fa) : 0.0,
-					kfh: !isNaN(body.kfh) ? parseFloat(body.kfh) : 0.0
-				},
-				labels: Array.isArray(body.labels) ? body.labels : [],
-				color: "color" in body ? body.color : null
-			});
-
-			data = mongoSanitize.sanitize(data);
-			validateFields(res.locals.user.club_id, data, function(errors, warnings){
-				if(Object.keys(errors).length == 0){				
-					app.db.collection("events").insertOne(data, function(err, insertRes){
-						if(err) throw err;
-						if(Object.keys(warnings).length > 0){
-							res.send({success: true, auth: true, warning: warnings, result: data._id});
-						}else{
-							res.send({success: true, auth: true, result: data._id});
-						}
-						
-					});							
-				}else{
-					res.send({success: false, auth: true, error: errors, warning: warnings});
-				}
-			});
-
-		}else{
-			res.send({success: false, auth: true, error: errors});
-		}
-	}
-));
-
 function checkEventAuth(projection, eventAuth, callback = null){
 	if(callback == null){
 		callback = eventAuth;
@@ -338,6 +43,463 @@ function checkEventAuth(projection, eventAuth, callback = null){
 		}, callback
 	);
 }
+
+function validateFields(club_id, data, callback){
+	if(data == null || !utils.isJSON(data)){
+		callback({},{});
+		return;
+	}
+
+	var checkUsers = false;
+	var checkTags = false;
+
+	var tryCallback = function(){
+		if(checkUsers && checkTags){
+			callback(validData, errors);
+		}
+	}
+
+	var validData = {};
+	var errors = {};
+
+	var validateUsers = {};
+	var validateTags = {};
+
+	if("name" in data){
+		validData.name = String(mongoSanitize.sanitize(data.name));
+	}
+
+	var checkChair = false;
+	if("chair_id" in data){
+		if(ObjectId.isValid(data.chair_id)){
+			var chairId = data.chair_id;
+			checkChair = true;
+			validateUsers[data.chair_id] = {_id: ObjectId(data.chair_id)};
+		}else{
+			errors.chair_id = "Invalid _id";
+		}
+	}
+
+	if("time" in data){
+		if(utils.isJSON(data.time)){
+			if("start" in data.time && "end" in data.time){
+				var start = moment(data.time.start, utils.isoFormat);
+				var end = moment(data.time.end, utils.isoFormat);
+
+				if(!start.isValid() || !end.isValid){
+					errors.time = "Start and end must be in ISO Format";
+				}else if(start.diff(end) > 0){
+					errors.time = "Start must be before end";
+				}else{
+					validData.time = {
+						start: start.toDate(),
+						end: end.toDate()
+					}
+				}
+			}else{
+				errors.time = "Must be have keys 'start' and 'end'";
+			}
+		}else{
+			errors.time = "Must be dict";
+		}
+	}
+
+	if("location" in data){
+		validData.location = String(mongoSanitize.sanitize(data.location));
+	}
+
+	if("contact" in data){
+		validData.contact = String(mongoSanitize.sanitize(data.contact));
+	}
+
+	var potentialTags = [];
+	if("tags" in data){
+		if(Array.isArray(data.tags)){
+			for(var i = 0; i < data.tags.length; i++){
+				if(ObjectId.isValid(data.tags[i])){
+					potentialTags.push({_id: ObjectId(data.tags[i])});
+				}else{
+					errors.tags = "Some tags are invalid";
+				}
+			}
+		}else{
+			errors.tags = "Must be array";
+		}
+	}
+
+	var potentialAttendees = {};
+	var numPotentialAttendees = 0;
+
+	if("attendees" in data){
+		if(Array.isArray(data.attendees)){
+			for(var i = 0; i < data.attendees.length; i++){
+				if(ObjectId.isValid(data.attendees[i])){
+					potentialAttendees[data.attendees[i]] = true;
+					numPotentialAttendees ++;
+					validateUsers[data.attendees[i]] = {_id: ObjectId(data.attendees[i])};
+				}else{
+					errors.attendees = "Some attendees are invalid";
+				}
+			}
+		}else{
+			errors.attendees = "Must be array";
+		}
+	}
+
+	if("hoursPerAttendee" in data){
+		if(utils.isJSON(data.hoursPerAttendee) && "service" in data.hoursPerAttendee && "leadership" in data.hoursPerAttendee && "fellowship" in data.hoursPerAttendee){
+			if(utils.isFloat(data.hoursPerAttendee.service)){
+				if(!("hoursPerAttendee" in validData)){
+					validData.hoursPerAttendee = {};
+				}
+
+				validData.hoursPerAttendee.service = parseFloat(data.hoursPerAttendee.service);
+			}else{
+				errors.hoursPerAttendee = "Hours must be floats";
+			}
+		
+
+			if(utils.isFloat(data.hoursPerAttendee.leadership)){
+				if(!("hoursPerAttendee" in validData)){
+					validData.hoursPerAttendee = {};
+				}
+
+				validData.hoursPerAttendee.leadership = parseFloat(data.hoursPerAttendee.leadership);
+			}else{
+				errors.hoursPerAttendee = "Hours must be floats";
+			}
+		
+
+			if(utils.isFloat(data.hoursPerAttendee.fellowship)){
+				if(!("hoursPerAttendee" in validData)){
+					validData.hoursPerAttendee = {};
+				}
+
+				validData.hoursPerAttendee.fellowship = parseFloat(data.hoursPerAttendee.fellowship);
+			}else{
+				errors.hoursPerAttendee = "Hours must be floats";
+			}
+			
+		}else{
+			errors.hoursPerAttendee = "Must be dict with keys (service, leadership, fellowship)";
+		}
+	}
+
+	var potentialOverrides = {};
+	var numPotentialOverrides = 0;
+	if("overrideHours" in data){
+		if(Array.isArray(data.overrideHours)){
+			for(var i = 0; i < data.overrideHours.length; i++){
+				var override = data.overrideHours[i];
+				if(utils.isJSON(override)){
+					if("attendee_id" in override && "service" in override && "leadership" in override && "fellowship" in override){
+						if(ObjectId.isValid(override.attendee_id) && utils.isFloat(override.service) && utils.isFloat(override.leadership) && utils.isFloat(override.fellowship)){
+							potentialOverrides[override.attendee_id] = {
+								attendee_id: ObjectId(override.attendee_id),
+								service: parseFloat(override.service),
+								leadership: parseFloat(override.leadership),
+								fellowshop: parseFloat(override.fellowship)
+							};
+
+							numPotentialOverrides ++;
+							validateUsers[override.attendee_id] = {_id: ObjectId(override.attendee_id)};
+						}else{
+							errors.overrideHours = "Some overrides are invalid";
+						}
+					}else{
+						errors.overrideHours = "Some overrides are invalid";
+					}
+				}else{
+					errors.overrideHours = "Some overrides are invalid";
+				}
+				
+			}
+
+		}else{
+			errors.overrideHours = "Must be array";
+		}
+	}
+
+	if("fundraised" in data){
+		if(utils.isJSON(data.fundraised) && "amountRaised" in data.fundraised && "amountSpent" in data.fundraised && "usedFor" in data.fundraised){
+			if(utils.isFloat(data.fundraised.amountRaised)){
+				if(!("fundraised" in validData)){
+					validData.fundraised = {};
+				}
+
+				validData.fundraised.amountRaised = parseFloat(parseFloat(data.fundraised.amountRaised).toFixed(2));
+			}else{
+				errors.fundraised = "Dollar amounts must be floats";
+			}
+		
+
+			if(utils.isFloat(data.fundraised.amountSpent)){
+				if(!("fundraised" in validData)){
+					validData.fundraised = {};
+				}
+
+				validData.fundraised.amountSpent = parseFloat(parseFloat(data.fundraised.amountSpent).toFixed(2));
+			}else{
+				errors.fundraised = "Dollar amounts must be floats";
+			}
+		
+
+			if(!("fundraised" in validData)){
+				validData.fundraised = {};
+			}
+
+			validData.fundraised.usedFor = mongoSanitize.sanitize(data.fundraised.usedFor);			
+			
+		}else{
+			errors.fundraised = "Must be dict with keys (amountRaised, amountSpent, usedFor)"
+		}
+	}
+
+	if("categories" in data){
+		if(Array.isArray(data.categories)){
+			var validCategories = [];
+			for(var i = 0; i < data.categories.length; i++){
+				validCategories.push(mongoSanitize.sanitize(String(data.categories[i])));
+			}
+
+			validData.categories = validCategories;
+		}else{
+			errors.categories = "Must be array";
+		}
+	}
+
+	if("comments" in data){
+		if(utils.isJSON(data.comments) && "summary" in data.comments && "strengths" in data.comments && "weaknesses" in data.comments && "improvements" in data.comments){
+			if(!("comments" in validData)){
+				validData.comments = {};
+			}
+
+			validData.comments.summary = mongoSanitize.sanitize(data.comments.summary);
+		
+
+			if(!("comments" in validData)){
+				validData.comments = {};
+			}
+
+			validData.comments.strengths = mongoSanitize.sanitize(data.comments.strengths);
+		
+
+			if(!("comments" in validData)){
+				validData.comments = {};
+			}
+
+			validData.comments.weaknesses = mongoSanitize.sanitize(data.comments.weaknesses);
+		
+
+			if(!("comments" in validData)){
+				validData.comments = {};
+			}
+
+			validData.comments.improvements = mongoSanitize.sanitize(data.comments.improvements);
+					
+		}else{
+			errors.comments = "Must be dict with keys (summary, strengths, weaknesses, improvements)";
+		}
+	}
+
+	if("drivers" in data){
+		if(Array.isArray(data.drivers)){
+			var validDrivers = [];
+			for(var i = 0; i < data.drivers.length; i++){
+				var driver = data.drivers[i];
+				if(utils.isJSON(driver)){
+					if("driver" in driver && "miles" in driver){
+						if(utils.isFloat(driver.miles)){
+							validDrivers.push({
+								driver: String(mongoSanitize.sanitize(driver.driver)), 
+								miles: parseFloat(driver.miles)
+							});
+
+						}else{
+							errors.drivers = "Some driver data is invalid";
+						}
+					}else{
+						errors.drivers = "Some driver data is invalid";
+					}
+				}else{
+					errors.drivers = "Some driver data is invalid";
+				}
+				
+			}
+
+			validData.drivers = validDrivers;
+		}else{
+			errors.drivers = "Must be array";
+		}
+	}
+
+	if("kfamAttendance" in data){
+		if(Array.isArray(data.kfamAttendance)){
+			var validKfam = [];
+			for(var i = 0; i < data.kfamAttendance.length; i++){
+				var kfam = data.kfamAttendance[i];
+				if(utils.isJSON(kfam)){
+					if("org" in kfam && "numAttendees" in kfam){
+						if(utils.isInt(kfam.numAttendees) && parseInt(kfam.numAttendees) > 0){
+							validKfam.push({
+								org: mongoSanitize.sanitize(String(kfam.org)), 
+								numAttendees: parseInt(kfam.numAttendees)
+							});
+						}else{
+							errors.drivers = "Some driver data are invalid";
+						}
+					}else{
+						errors.drivers = "Some driver data are invalid";
+					}
+				}else{
+					errors.drivers = "Some driver data are invalid";
+				}
+			}
+
+			validData.kfamAttendance = validKfam;
+		}else{
+			errors.kfamAttendance = "Must be array";
+		}
+	}
+
+	var potentialUsers = Object.values(validateUsers);
+	if(potentialUsers.length > 0){
+		var query = {club_id: club_id, $or: potentialUsers};
+		var projection = {_id: 1};
+		app.db.collection("members").find(query, {projection: projection}).toArray(function(err, members){
+			if(err) throw err;
+			for(var i = 0; i < members.length; i++){
+				var member = members[i];
+				var memberId = String(member._id);
+				var member_id = ObjectId(member._id);
+
+				if(checkChair && memberId == String(chairId)){
+					validData.chair_id = member_id;
+				}
+
+				if(memberId in potentialAttendees){
+					if(!("attendees" in validData)){
+						validData.attendees = [];
+					}
+
+					validData.attendees.push(member_id);
+				}
+
+				if(memberId in potentialOverrides){
+					if(!("overrideHours" in validData)){
+						validData.overrideHours = [];
+					}
+
+					validData.overrideHours.push(potentialOverrides[memberId]);
+				}			
+			}
+
+			if(checkChair && !("chair_id" in validData)){
+				errors.chair_id = "Invalid _id";
+			}
+
+			if("attendees" in data){
+				if(!("attendees" in validData)){
+					errors.attendees = "Some attendees are invalid";
+				}else if(validData.attendees.length < numPotentialAttendees){
+					errors.attendees = "Some attendees are invalid";
+				}
+			}
+			
+			if("overrideHours" in data){
+				if(!("overrideHours" in validData)){
+					errors.overrideHours = "Some overrides are invalid";
+				}else if(validData.overrideHours.length < numPotentialOverrides){
+					errors.overrideHours = "Some overrides are invalid";
+				}
+			}
+			
+			checkUsers = true;
+			tryCallback();
+		});				
+	}else{
+		checkUsers = true;
+		tryCallback();
+	}
+
+
+	if(potentialTags.length > 0){
+		var projection = {_id: 1};
+		var tagQuery = {$or: potentialTags};
+		app.db.collection("tags").find(tagQuery, {projection: projection}).toArray(function(err, tags){
+			if(err) throw err;
+			tags.forEach(function(elem){
+				if(!("tags" in validData)){
+					validData.tags = [];
+				}
+
+				validData.tags.push(elem._id);
+			});
+
+			checkTags = true;
+			tryCallback();
+		});			
+	}else{
+		checkTags = true;
+		tryCallback();
+	}
+}
+
+router.post('/new', auth.checkAuth(
+	function(req, res, auth){
+		auth(true);
+	},
+
+	function(req, res, next){
+		var body = req.body;
+		var errors = {};
+
+		validateFields(res.locals.user.club_id, body, function(data, errors){
+			var newData = {
+				club_id: res.locals.user.club_id,
+				division_id: res.locals.user.division_id,
+				status: 0,
+				name: "name" in data ? data.name : "",
+				author_id: res.locals.user._id,
+				chair_id: "chair_id" in data ? data.chair_id : "", 
+				time: "time" in data ? data.time : {
+					start: new Date(), 
+					end: new Date()
+				},
+				location: "location" in data ? data.location : "",
+				contact: "contact" in data ? data.contact : "",
+				tags: "tags" in data ? data.tags : [],
+				attendees: "attendees" in data ? data.attendees : [],
+				hoursPerAttendee: "hoursPerAttendee" in data ? data.hoursPerAttendee : {
+					service: 0.0,
+					leadership: 0.0,
+					fellowship: 0.0
+				},
+				overrideHours: "overrideHours" in data ? data.overrideHours : [],
+				fundraised: "fundraised" in data ? data.fundraised : {
+					amountRaised: 0.0,
+					amountSpent: 0.0,
+					usedFor: ""
+				},
+				categories: "categories" in data ? data.categories : [],
+				comments: "comments" in data ? data.comments : {
+					summary: "",
+					strengths: "",
+					weaknesses: "",
+					improvements: ""
+				},
+				drivers: "drivers" in data ? data.drivers: [],
+				kfamAttendance: "kfamAttendance" in data ? data.kfamAttendance: []
+			};
+
+			app.db.collection("events").insertOne(newData, function(err, insertRes){
+				if(err) throw err;
+				res.send({success: true, auth: true, result: newData._id, warning: errors});
+				
+			});
+		});
+	}
+));
 
 router.get('/:eventId', checkEventAuth(
 	function(req, res, auth){
@@ -377,76 +539,16 @@ router.patch('/:eventId', checkEventAuth({author_id: 1, club_id: 1, status: 1, t
 	function(req, res, next){
 		var body = req.body;
 		if(Object.keys(body).length > 0){
-			var errors = {};
-			var data = {};
-			if("name" in body) 
-				data.name = body.name;
-			if("chair_id" in body) 
-				data.chair_id = body.chair_id;
-
-			if("time" in body){
-				if(utils.isJSON(body.time)){
-					if("start" in body.time && "end" in body.time){
-						var start = moment(body.time.start, utils.isoFormat);
-						var end = moment(body.time.end, utils.isoFormat);
-						if(!start.isValid() || !end.isValid){
-							errors.time = "Times must be in ISO Format";
-						}else if(start.diff(end) > 0){
-							errors.time = "Start time must be after end time";
-						}else{
-							data.time = {start: start.toDate(), end: end.toDate()};	
-						}
-					}else{
-						errors.time = "Must be have keys 'start' and 'end'";
-					}
-				}else{
-					errors.time = "Must be JSON";
+			validateFields(res.locals.user.club_id, body, function(data, errors){
+				if(Object.keys(data).length > 0){
+					var eventQuery = {_id: res.locals.event._id};
+					app.db.collection("events").updateOne(eventQuery, {$set: data}, function(err, updateRes){
+						if(err) throw err;
+						res.send({success: true, auth: true, warning: errors});
+					});
 				}
-			}
+			});
 
-			if("tags" in body) 
-				data.tags = Array.isArray(body.tags) ? body.tags : [];
-			if("attendees" in body) 
-				data.attendees = Array.isArray(body.attendees) ? body.attendees : [];
-			if("service" in body)
-				data["hoursPerAttendee.service"] = !isNaN(body.service) ? parseFloat(body.service) : 0;
-			if("leadership" in body)
-				data["hoursPerAttendee.leadership"] = !isNaN(body.leadership) ? parseFloat(body.leadership) : 0;
-			if("fellowship" in body)	
-				data["hoursPerAttendee.fellowship"] = !isNaN(body.fellowship) ? parseFloat(body.fellowship) : 0;			
-			if("overrideHours" in body) 
-				data.overrideHours = Array.isArray(body.overrideHours) ? body.overrideHours : [];
-			if("ptp" in body)
-				data["fundraised.ptp"] = !isNaN(body.ptp) ? parseFloat(body.ptp) : 0;
-			if("fa" in body)
-				data["fundraised.fa"] = !isNaN(body.fa) ? parseFloat(body.fa) : 0;			
-			if("kfh" in body)
-				data["fundraised.kfh"] = !isNaN(body.kfh) ? parseFloat(body.kfh) : 0;
-			if("labels" in body)
-				data["labels"] = Array.isArray(body.labels) ? body.labels : [];
-			if("color" in body)
-				data["color"] = String(body.color);
-
-			if(Object.keys(errors).length == 0){
-				validateFields(res.locals.user.club_id, data, function(errors, warnings){
-					if(Object.keys(errors).length == 0){	
-						var eventQuery = {_id: res.locals.event._id};
-						app.db.collection("events").updateOne(eventQuery, {$set: data}, function(err, updateRes){
-							if(err) throw err;
-							if(Object.keys(warnings).length > 0){
-								res.send({success: true, auth: true, warning: warnings});
-							}else{
-								res.send({success: true, auth: true});
-							}
-							
-						});							
-					}else{
-						res.send({success: false, auth: true, error: errors, warning: warnings});
-					}
-				});
-			}else{
-				res.send({success: false, auth: true, error: errors});
-			}
 		}else{
 			res.send({success: true, auth: true});
 		}
@@ -483,7 +585,6 @@ router.patch('/:eventId/submit', checkEventAuth({club_id: 1, author_id: 1, statu
 		var user = res.locals.user;
 		var event = res.locals.event;
 		auth(event.club_id.equals(user.club_id) && event.status != 2 && (user.access.club > 0 || event.author_id.equals(user._id)));
-
 	}, 
 
 	function(req, res, next){
@@ -529,7 +630,7 @@ router.patch('/:eventId/confirm', checkEventAuth({club_id: 1, status: 1, hoursPe
 		}else{
 			if(now.year() === eventTime.year()){
 				editableDate = now.month() - eventTime.month() < 2;
-			}else if(auth.year() === eventTime.year() + 1){
+			}else if(now.year() === eventTime.year() + 1){
 				editableDate = now.month() === 0 && eventTime.month() === 11;
 			}
 		}

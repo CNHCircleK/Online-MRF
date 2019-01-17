@@ -16,7 +16,6 @@ router.all('*', function(req, res, next){
 });
 
 router.get("/", function(req, res, next){
-
 	res.send("Success");
 });
 
@@ -31,10 +30,12 @@ router.post('/divisions/create', function(req, res, next){
 	}
 });
 
+//TODO
 router.get('/clubs', function(req, res, next){
 	res.send({success:true});
 });
 
+//TODO
 router.post('/clubs/create', function(req, res, next){
 
 });
@@ -58,115 +59,6 @@ router.post('/tags/create', function(req, res, next){
 		res.send({success: false, auth: true, error: errors});
 	}
 });
-
-function createMRF(clubId, divisionId, year, month, callback = function(){}){
-	var data = {
-		club_id: ObjectId(clubId),
-		division_id: ObjectId(divisionId),
-		year: year,
-		month: month,
-		status: 0,
-		submissionTime: null,
-		updates: {
-			duesPaid: null,
-			newDuesPaid: null
-		},
-		goals: [],
-		meetings: {
-			1: {
-				date: null,
-				members: null,
-				nonHomeMembers: null,
-				kiwanis: null,
-				guests: null,
-				advisorAttendance:{
-					faculty: null,
-					kiwanis: null
-				}
-			},
-
-			2: {
-				date: null,
-				members: null,
-				nonHomeMembers: null,
-				kiwanis: null,
-				guests: null,
-				advisorAttendance:{
-					faculty: null,
-					kiwanis: null
-				}
-			},
-
-			3: {
-				date: null,
-				members: null,
-				nonHomeMembers: null,
-				kiwanis: null,
-				guests: null,
-				advisorAttendance:{
-					faculty: null,
-					kiwanis: null
-				}
-			},
-
-			4: {
-				date: null,
-				members: null,
-				nonHomeMembers: null,
-				kiwanis: null,
-				guests: null,
-				advisorAttended:{
-					faculty: null,
-					kiwanis: null
-				}
-			},
-
-			5: {
-				date: null,
-				members: null,
-				nonHomeMembers: null,
-				kiwanis: null,
-				guests: null,
-				advisorAttendance:{
-					faculty: null,
-					kiwanis: null
-				}
-			}
-		},
-
-		dcm:{
-			date: null,
-			presidentAttended: null,
-			members: null,
-			nextDate: null
-		},
-
-		communications:{
-			ltg:{
-				message: null,
-				contacted:{
-					visit: null,
-					phone: null,
-					email: null,
-					newsletter: null,
-					other: null
-				}
-			},
-			dboard: null
-		},
-
-		kfamReport: null
-	};
-
-	app.db.collection("mrfs").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
-		if(err){
-			callback(err);
-			return;
-		}
-
-		callback(null, true);
-	});	
-}
 
 
 module.exports = router;

@@ -79,7 +79,7 @@ router.post("/:divisionId/clubs", checkDivisionAuth({_id: 1},
 		var body = req.body;
 		var errors = {};
 
-		if("name" in body){
+		if(!("name" in body)){
 			errors["name"] = "Required";
 		}
 
@@ -119,7 +119,7 @@ router.post("/:divisionId/clubs", checkDivisionAuth({_id: 1},
 						"other": []
 					},
 					"fellowship": {
-						"duesPaid": null,
+ 						"duesPaid": null,
 						"interclubs": null
 					}
 				}
@@ -150,7 +150,7 @@ router.get("/:divisionId/mrfs", checkDivisionAuth({_id: 1},
 	function(req, res, next){
 		var now = new Date();
 		var query = {division_id: res.locals.division._id, year: now.getFullYear(), month: now.getMonth() + 1, status: 1};
-		var projection = {_id: 0, year: 1, month: 1, submissionTime: 1};
+		var projection = {year: 1, month: 1, submissionTime: 1};
 
 		app.db.collection("mrfs").find(query, {projection: projection}).toArray(function(err, mrfs){
 			if(err) throw err;

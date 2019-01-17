@@ -33,7 +33,8 @@ router.get("/tags", auth.checkAuth(
 	},
 
 	function(req, res, next){
-		app.db.collection("tags").find({}).toArray(function(err, tags){
+		var tagProjection = {abbrev: 1, name: 1, active: 1}
+		app.db.collection("tags").find({}, {projection: tagProjection}).toArray(function(err, tags){
 			if(err) throw err;
 			res.send({success: true, auth: true, result: tags});
 		});
