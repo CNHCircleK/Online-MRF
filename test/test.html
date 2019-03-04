@@ -4,87 +4,181 @@
 	<title>Test Page</title>
 </head>
 <body>
+	<div style="background-color: black; height: 100vh;" onclick="window.location.reload(false);">
+		Test
+	</div>
 	<script
 		src="https://code.jquery.com/jquery-3.3.1.min.js"
-		integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+		integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="r
 		crossorigin="anonymous">		
 	</script>
 
 	<script>
+		var divisionData = {
+			name: "Sunset"
+		};
+		var clubData = {
+			name: "Some School"
+		};
+		var adminData = {
+			memberId: "5b76472b34ca951af1416fab",
+			access: 1,
+			position: "Aboard"
+		};
+		var eventData = {
+			name: "Event Name",
+			chair_id: "5c3ff95dc6a26d70b3be4623", 
+			time: {
+				start: new Date().toISOString(), 
+				end: new Date().toISOString()
+			},
+			location: "location",
+			contact: "contact",
+			tags: ["5b3f125b05917c3b02dfc69b"],
+			attendees: ["5b6d21b4a658cb1b960249f0", "5c3ff95dc6a26d70b3be4623", "5c3ff95dc6a26d70b3be4643"],
+			hoursPerAttendee: {
+				service: 3.1,
+				leadership: 4.2,
+				fellowship: 5.3
+			},
+			overrideHours: [
+				{"attendee_id": "5b6d21b4a658cb1b960249f0", service: 100, leadership: 101, fellowship: 102},
+				{"attendee_id": "5c3ff95dc6a26d70b3be4623", service: 100, leadership: 101, fellowship: 102}
+			],
+			fundraised: {
+				amountRaised: 10.4,
+				amountSpent: 20.4,
+				usedFor: "Usedfor"
+			},
+			categories: ["Test1", "Test2", "Test3"],
+			comments: {
+				summary: "sum",
+				strengths: "str",
+				weaknesses: "weak",
+				improvements: "impr"
+			},
+			drivers: [
+				{"driver": "Bob", milesTo: 3.3, milesFrom: 3.3}
+			],
+			kfamAttendance: [
+				{org: "School Key Club", numAttendees: 3}
+			]
+		};
+
+		var mrf = {
+			status: 0,
+			numDuesPaid: 5,
+			goals: ["Goal", "asdasd"],
+			meetings: [
+				{
+					date: new Date().toISOString(),
+					attendance: {
+						numMembers: 1,
+						numNonHomeMembers: 2,
+						numKiwanis: 3,
+						numGuests: 4
+					},
+					advisorAttended:{
+						faculty: true,
+						kiwanis: false
+					}
+				},
+				{
+					date: new Date().toISOString(),
+					attendance: {
+						numMembers: 100,
+						numNonHomeMembers: 2,
+						numKiwanis: 3,
+						numGuests: 4
+					}
+				}
+			],
+			boardMeetings: [
+				{
+					date: new Date().toISOString(),
+					attendance:{
+						numBoard: 44,
+						numGuests: 34
+					}
+				},
+				{
+					date: new Date().toISOString(),
+					attendance:{
+						numBoard: 44,
+					}
+				}
+			],
+
+			dcm: {
+				date: new Date().toISOString(),
+				presidentAttended: false,
+				numMembers: 4,
+				nextDate: new Date().toISOString()
+			},
+
+			communications:{
+				ltg: "HI",
+				dboard: "Bye"
+			},
+
+			kfamReport: true
+		}
+
 		var token = null;
 		$.ajax({
 			url: "http://localhost:3000/signin",
 			type: 'post',
 			data: {
-				name: "user",
-				password: "pass"
+				email: "Mail@mail.com",
+				password: "password"
 			},
 			dataType: 'json',
 			success: function(res){
+				console.log(res);
 				if(res.success){
 					token = res.result;
 					$.ajax({
-						url: "http://localhost:3000/events/new",
-						type: 'post',
+						url: "http://localhost:3000/members/5b6d21b4a658cb1b960249f0/events",
+						type: 'get', 
 						beforeSend: function(req){
 							req.setRequestHeader("Authorization", "Basic " + token);
 						},
 						dataType: 'json',
-						data: {
-							name: "Event Name",
-							chair_id: "5c3ff95dc6a26d70b3be4623", 
-							time: {
-								start: new Date(), 
-								end: new Date()
-							},
-							location: "location",
-							contact: "contact",
-							tags: ["5b3f125b05917c3b02dfc69b"],
-							attendees: ["5c3ff95bc6a26d70b3be4621", "5c3ff95dc6a26d70b3be4623", "5c3ff95dc6a26d70b3be4643"],
-							hoursPerAttendee: {
-								service: 3.1,
-								leadership: 4.2,
-								fellowship: 5.3
-							},
-							overrideHours: [
-								{"attendee_id": "5c3ff95dc6a26d70b3be4623", service: 100, leadership: 101, fellowship: 102},
-								{"attendee_id": "5b498a5b200a8f6afa46c1sadasd0", service: 100, leadership: 101, fellowship: 102}
-							],
-							fundraised: {
-								amountRaised: 10.4,
-								amountSpent: 20.4,
-								usedFor: "Usedfor"
-							},
-							categories: ["Test1", "Test2", "Test3"],
-							comments: {
-								summary: "sum",
-								strengths: "str",
-								weaknesses: "weak",
-								improvements: "impr"
-							},
-							drivers: [
-								{"driver": "Bob", miles: 3.3}
-							],
-							kfamAttendance: [
-								{org: "School Key Club", numAttendees: 3}
-							]
-						},
+						data: mrf,
 						success: function(res){
 							console.log(res);
-							$.ajax({
-								url: "http://localhost:3000/events/" + res.result,
-								type: 'get',
-								beforeSend: function(req){
-									req.setRequestHeader("Authorization", "Basic " + token);
-								},
-								dataType: 'json',
-								success: function(res){
-									console.log(res);
-								},
-								error: function(res){
-									console.log(res.responseText);
-								}
-							});	
+							/*$.ajax({
+										url: "http://localhost:3000/signin",
+										type: 'post',
+										data: {
+											email: "Mail@mail.com",
+											password: "password"
+										},
+										dataType: 'json',
+										success: function(res){
+											console.log(res);
+											if(res.success){
+												token = res.result;
+												$.ajax({
+													url: "http://localhost:3000/clubs/5b6d2054f176363426fe5b93/mrfs/2019/3",
+													type: 'get', 
+													beforeSend: function(req){
+														req.setRequestHeader("Authorization", "Basic " + token);
+													},
+													dataType: 'json',
+													data: mrf,
+													success: function(res){
+														console.log(res);
+														
+													},
+													error: function(res){
+														console.log(res.responseText);
+													}
+												});		
+											}		
+										}
+									});*/
+							
 						},
 						error: function(res){
 							console.log(res.responseText);

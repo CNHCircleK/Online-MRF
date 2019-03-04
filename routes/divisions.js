@@ -6,157 +6,256 @@ var mongo = require('mongodb');
 var ObjectId = mongo.ObjectId;
 var mongoSanitize = require('express-mongo-sanitize');
 
-var auth = require('../auth');
+var checkAuth = require("../auth").checkAuth;
 var utils;
 
-router.all('*', function(req, res, next){
-	app = req.app;
-	utils = require('mrf-utils')(app);
-	next();	
-});
+var moment = require('moment');
 
-function checkDivisionAuth(projection, divisionAuth, callback = null){
-	if(callback == null){
-		callback = divisionAuth;
-		divisionAuth = projection;
-		projection = {};
+function getDivision(divisionId, projection, callback){
+	if(!ObjectId.isValid(divisionId)){
+		callback(null);
+		return;
 	}
 
-	return auth.checkAuth(
-		function(req, res, auth){
-			var user = res.locals.user;
-			if(!ObjectId.isValid(req.params.divisionId)){
-				auth(false);
-			}else{
-				var query = {"_id": ObjectId(req.params.divisionId)};
-				app.db.collection("divisions").findOne(query, {projection: projection}, function(err, division){
-					if(err) throw err;
-					if(division != null){
-						res.locals.division = division;
-						divisionAuth(req, res, auth);
-					}else{
-						auth(false);
-					}
-					
-				});				
-			}
-		}, callback
-	);
-
+	var query = {"_id": ObjectId(divisionId)};
+	app.db.collection("divisions").findOne(query, {projection: projection}, function(err, division){
+		if(err) throw err;
+		callback(division);
+	});		
 }
 
-router.get("/:divisionId/clubs", checkDivisionAuth({_id: 1},
-	function(req, res, auth){
-		var division = res.locals.division;
+function getClubs(divisionId, projection, callback){
+	var query = {division_id: ObjectId(divisionId)};
+	app.db.collection("clubs").find(query, {projection: projection}).sort({name: 1}).toArray(function(err, clubs){
+		if(err) throw err;
+		callback(clubs);
+	});	
+}
+
+router.get("/", checkAuth(function(req, res, auth){
+	auth(res.locals.user.access.district > 0);
+}), function(req, res, next){
+	app.db.collection("divisions").find({}, {projection: {name: 1}}).toArray(function(err, divisions){
+		if(err) throw err;
+		res.send({success: true, auth: true, result: divisions});
+	});
+});
+
+router.post("/", checkAuth(function(req, res, auth){
+	auth(res.locals.user.access.district > 0);
+}), function(req, res, next){
+	var body = req.body;
+	if('name' in body){
+		var data = {"name": String(body['name'])};
+		app.db.collection("divisions").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
+			if(err) throw err;
+			res.send({success: true, auth: true, result: data._id});
+		});
+	}else{
+		res.send({success: false, auth: true, error: {name: "Required"}});
+	}
+});
+
+router.get("/:divisionId", checkAuth(function(req, res, auth){
+	getDivision(req.params.divisionId, {name: 1}, function(division){
+		if(division == null){
+			auth(false);
+			return;
+		}
+
+		res.locals.division = division;
 		var user = res.locals.user;
 
 		if(division._id.equals(user.division_id)){
 			auth(user.access.division > 0);
 		}else{
-			auth(user.access.district == 1);
-		}	
-	},
+			auth(user.access.district > 0);
+		}		
+	});
 
-	function(req, res, next){
-		var query = {division_id: res.locals.division._id};
-		var projection = {name: 1};
+}), function(req, res, next){
+	res.send({success: true, auth: true, result: res.locals.division});
+});
 
-		app.db.collection("clubs").find(query, {projection: projection}).toArray(function(err, result){
+router.delete("/:divisionId", checkAuth(function(req, res, auth){
+	var user = res.locals.user;
+	if(user.access.district > 0){
+		getDivision(req.params.divisionId, {_id: 1}, function(division){
 			if(err) throw err;
-			res.send({success: true, auth: true, result: result})
+			if(division == null){
+				auth(false);
+				return;
+			}
+
+			getClubs(req.params.divisionId, {_id: 1}, function(clubs){
+				if(clubs.length > 0){
+					auth(true, false, {division: "Cannot delete division with existing clubs"});
+					return;
+				}
+
+				auth(true);
+			});
+			
 		});
+	}else{
+		auth(false);
 	}
-));
+	
+}), function(req, res, next){
+	app.db.collection("divisions").remove({_id: ObjectId(req.params.divisionId)}, function(err){
+		if(err) throw err;
+		res.send({success: true, auth: true});
+	});
+});
 
-router.post("/:divisionId/clubs", checkDivisionAuth({_id: 1},
-	function(req, res, auth){
-		var division = res.locals.division;
-		var user = res.locals.user;
-		auth(division._id.equals(user.division_id) && user.access.division > 0);
-	},
-
-	function(req, res, next){
-		var body = req.body;
-		var errors = {};
-
-		if(!("name" in body)){
-			errors["name"] = "Required";
+router.get("/:divisionId/clubs", checkAuth(function(req, res, auth){
+	getDivision(req.params.divisionId, {_id: 1}, function(division){
+		if(division == null){
+			auth(false);
+			return;
 		}
 
-		if(Object.keys(errors).length == 0){
-			var data = {
-				"name": String(body['name']),
-				"division_id": res.locals.division._id,
-				"members": [],
-				"admin":{
-					"advisor": {
-						"faculty": null,
-						"kiwanis": null
+		res.locals.division = division;
+		var user = res.locals.user;
+
+		if(division._id.equals(user.division_id)){
+			auth(user.access.division > 0);
+		}else{
+			auth(user.access.district > 0);
+		}		
+	});
+
+}), function(req, res, next){
+	getClubs(req.params.divisionId, {name:1}, function(clubs){
+		res.send({success: true, auth: true, result: clubs});
+	});
+});
+
+router.post("/:divisionId/clubs", checkAuth(function(req, res, auth){
+	getDivision(req.params.divisionId, {_id: 1},function(division){
+		if(division == null){
+			auth(false);
+			return;
+		}
+
+		res.locals.division = division;
+		var user = res.locals.user;
+
+		auth(division._id.equals(user.division_id) && user.access.division > 0);		
+	});
+	
+}), function(req, res, next){
+	var body = req.body;
+	var errors = {};
+
+	if(!("name" in body)){
+		errors["name"] = "Required";
+	}
+
+	if(Object.keys(errors).length == 0){
+		var data = {
+			"name": String(body['name']),
+			"division_id": res.locals.division._id,
+			"goals":{
+				"service": {
+					"hours":{
+						"total": null,
+						"perMember": null
 					},
-					"executive": {
-						"president": null,
-						"avp": null,
-						"svp": null,
-						"secretary": null,
-						"treasurer": null 
+					"fundraising": {
+						"ptp": null,
+						"fa": null,
+						"kfh": null
 					},
-					"appointed": {}
+					"other": []
 				},
-				"goals":{
-					"service": {
-						"hours":{
-							"total": null,
-							"perMember": null
-						},
-						"fundraising": {
-							"ptp": null,
-							"fa": null,
-							"kfh": null
-						},
-						"other": []
-					},
-					"leadership": {
-						"other": []
-					},
-					"fellowship": {
- 						"duesPaid": null,
-						"interclubs": null
+				"leadership": {
+					"other": []
+				},
+				"fellowship": {
+						"duesPaid": null,
+					"interclubs": null
+				}
+			}
+		};
+
+		app.db.collection("clubs").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
+			if(err) throw err;
+			res.send({success: true, auth: true, result: data._id});
+		});
+	}else{
+		res.send({success: false, auth: true, error: errors});
+	}	
+});
+
+router.get("/:divisionId/mrfs/:year/:month", checkAuth(function(req, res, auth){
+	getDivision(req.params.divisionId, {_id: 1},function(division){
+		res.locals.division = division;
+		var user = res.locals.user;
+
+		if(division == null){
+			auth(false);
+			return;
+		}
+		if(utils.isInt(req.params.year) && utils.isInt(req.params.month)){
+			req.params.year = Number(req.params.year);
+			req.params.month = Number(req.params.month);
+			var year = req.params.year;
+			var month = req.params.month;
+
+			if(month > 0 && month <= 12){
+				var now = moment();
+				if(now.year() < year){
+					auth(false);
+					return;
+				}else if(now.year() === year){
+					if(now.month() + 1 < month){
+						auth(false);
+						return;
 					}
 				}
-			};
 
-			app.db.collection("clubs").insertOne(mongoSanitize.sanitize(data), function(err, insertRes){
-				if(err) throw err;
-				res.send({success: true, auth: true, result: data._id});
-			});
+				if(division._id.equals(user.division_id)){
+					auth(user.access.division > 0);
+				}else{
+					auth(user.access.district > 0);
+				}
+
+			}else{
+				auth(false);
+			}
 		}else{
-			res.send({success: false, auth: true, error: errors});
-		}
-	}
-));
+			auth(false);
+		}		
+	});
+	
+}), function(req, res, next){
+	getClubs(res.locals.division._id, {name: 1, _id: 1}, function(clubs){
+		var year = Number(req.params.year);
+		var month = Number(req.params.month);
 
-router.get("/:divisionId/mrfs", checkDivisionAuth({_id: 1},
-	function(req, res, auth){
-		var division = res.locals.division;
-		var user = res.locals.user;
-
-		if(division._id.equals(user.division_id)){
-			auth(user.access.division > 0);
-		}else{
-			auth(user.access.district == 1);
-		}	
-	},
-
-	function(req, res, next){
-		var now = new Date();
-		var query = {division_id: res.locals.division._id, year: now.getFullYear(), month: now.getMonth() + 1, status: 1};
-		var projection = {year: 1, month: 1, submissionTime: 1};
-
-		app.db.collection("mrfs").find(query, {projection: projection}).toArray(function(err, mrfs){
-			if(err) throw err;
-			res.send({success: true, auth: true, result: mrfs});
+		var clubNames = {};
+		var clubIds = clubs.map(function(club){ 
+			clubNames[String(club._id)] = club.name;
+			return club._id 
 		});
-	}
-));
 
-module.exports = router;
+		app.get("mrfsRoute").getMRF(clubIds, year, month, {club_id: 1}, function(mrf){
+			mrf.forEach(function(clubMRF){
+				clubMRF.club = {name: clubNames[String(clubMRF.club_id)], _id: clubMRF.club_id};
+				delete clubMRF.club_id;
+			});
+
+			res.send({success: true, auth: true, result: mrf});
+		})
+	});
+});
+
+module.exports = function(newApp){
+	app = newApp;
+	utils = require('mrf-utils')(app);
+	return {
+		router: router,
+		getDivision: getDivision
+	};
+}

@@ -6,43 +6,21 @@ var mongo = require('mongodb');
 var ObjectId = mongo.ObjectId;
 var mongoSanitize = require('express-mongo-sanitize');
 
-var auth = require("../auth");
-var utils;
-
+var checkAuth = require("../auth").checkAuth;
 var moment = require('moment');
 
-router.all('*', function(req, res, next){
-	app = req.app;
-	utils = require('mrf-utils')(app);
-	next();
-});
+var utils;
 
-function checkEventAuth(projection, eventAuth, callback = null){
-	if(callback == null){
-		callback = eventAuth;
-		eventAuth = projection;
-		projection = {};
+function getEvent(eventId, projection, callback){
+	if(!ObjectId.isValid(eventId)){
+		callback(null,null);
+		return;
 	}
 
-	return auth.checkAuth(
-		function(req, res, auth){
-			var user = res.locals.user;
-			if(!ObjectId.isValid(req.params.eventId)){
-				auth(false);
-			}else{
-				app.db.collection("events").findOne({"_id": ObjectId(req.params.eventId)}, {projection: projection}, function(err, event){
-					if(err) throw err;
-					if(event != null){
-						res.locals.event = event;
-						eventAuth(req, res, auth);
-					}else{
-						auth(false);
-					}
-				});				
-			}
-		}, callback
-	);
+	var query = {"_id": ObjectId(eventId)};
+	app.db.collection("events").findOne(query, {projection: projection}, callback);
 }
+
 
 function validateFields(club_id, data, callback){
 	if(data == null || !utils.isJSON(data)){
@@ -67,6 +45,14 @@ function validateFields(club_id, data, callback){
 
 	if("name" in data){
 		validData.name = String(mongoSanitize.sanitize(data.name));
+	}
+
+	if("status" in data){
+		if(utils.isInt(data.status) && (data.status == 0 || data.status == 1)){
+			validData.status = parseInt(data.status);
+		}else{
+			errors.status = "Must be either 0 or 1";
+		}
 	}
 
 	var checkChair = false;
@@ -198,7 +184,7 @@ function validateFields(club_id, data, callback){
 								attendee_id: ObjectId(override.attendee_id),
 								service: parseFloat(override.service),
 								leadership: parseFloat(override.leadership),
-								fellowshop: parseFloat(override.fellowship)
+								fellowship: parseFloat(override.fellowship)
 							};
 
 							numPotentialOverrides ++;
@@ -446,66 +432,65 @@ function validateFields(club_id, data, callback){
 	}
 }
 
-router.post('/new', auth.checkAuth(
-	function(req, res, auth){
-		auth(true);
-	},
+router.post("/", checkAuth(function(req, res, auth){
+	auth(true);
+}), function(req, res, next){
+	var body = req.body;
+	var errors = {};
+	validateFields(res.locals.user.club_id, body, function(data, errors){
+		var newData = {
+			club_id: res.locals.user.club_id,
+			division_id: res.locals.user.division_id,
+			status: "status" in data ? data.status : 0,
+			name: "name" in data ? data.name : "",
+			author_id: res.locals.user._id,
+			chair_id: "chair_id" in data ? data.chair_id : "", 
+			time: "time" in data ? data.time : {
+				start: new Date(), 
+				end: new Date()
+			},
+			location: "location" in data ? data.location : "",
+			contact: "contact" in data ? data.contact : "",
+			tags: "tags" in data ? data.tags : [],
+			attendees: "attendees" in data ? data.attendees : [],
+			hoursPerAttendee: "hoursPerAttendee" in data ? data.hoursPerAttendee : {
+				service: 0.0,
+				leadership: 0.0,
+				fellowship: 0.0
+			},
+			overrideHours: "overrideHours" in data ? data.overrideHours : [],
+			fundraised: "fundraised" in data ? data.fundraised : {
+				amountRaised: 0.0,
+				amountSpent: 0.0,
+				usedFor: ""
+			},
+			categories: "categories" in data ? data.categories : [],
+			comments: "comments" in data ? data.comments : {
+				summary: "",
+				strengths: "",
+				weaknesses: "",
+				improvements: ""
+			},
+			drivers: "drivers" in data ? data.drivers: [],
+			kfamAttendance: "kfamAttendance" in data ? data.kfamAttendance: []
+		};
 
-	function(req, res, next){
-		var body = req.body;
-		var errors = {};
-
-		validateFields(res.locals.user.club_id, body, function(data, errors){
-			var newData = {
-				club_id: res.locals.user.club_id,
-				division_id: res.locals.user.division_id,
-				status: 0,
-				name: "name" in data ? data.name : "",
-				author_id: res.locals.user._id,
-				chair_id: "chair_id" in data ? data.chair_id : "", 
-				time: "time" in data ? data.time : {
-					start: new Date(), 
-					end: new Date()
-				},
-				location: "location" in data ? data.location : "",
-				contact: "contact" in data ? data.contact : "",
-				tags: "tags" in data ? data.tags : [],
-				attendees: "attendees" in data ? data.attendees : [],
-				hoursPerAttendee: "hoursPerAttendee" in data ? data.hoursPerAttendee : {
-					service: 0.0,
-					leadership: 0.0,
-					fellowship: 0.0
-				},
-				overrideHours: "overrideHours" in data ? data.overrideHours : [],
-				fundraised: "fundraised" in data ? data.fundraised : {
-					amountRaised: 0.0,
-					amountSpent: 0.0,
-					usedFor: ""
-				},
-				categories: "categories" in data ? data.categories : [],
-				comments: "comments" in data ? data.comments : {
-					summary: "",
-					strengths: "",
-					weaknesses: "",
-					improvements: ""
-				},
-				drivers: "drivers" in data ? data.drivers: [],
-				kfamAttendance: "kfamAttendance" in data ? data.kfamAttendance: []
-			};
-
-			app.db.collection("events").insertOne(newData, function(err, insertRes){
-				if(err) throw err;
-				res.send({success: true, auth: true, result: newData._id, warning: errors});
-				
-			});
+		app.db.collection("events").insertOne(newData, function(err, insertRes){
+			if(err) throw err;
+			res.send({success: true, auth: true, result: newData._id, warning: errors});
+			
 		});
-	}
-));
+	});	
+});
 
-router.get('/:eventId', checkEventAuth(
-	function(req, res, auth){
+router.get("/:eventId", checkAuth(function(req, res, auth){
+	getEvent(req.params.eventId, {}, function(err, event){
+		if(event == null){
+			auth(false);
+		}
+		
 		var user = res.locals.user;
-		var event = res.locals.event;
+		res.locals.event = event;
 
 		if(event.club_id.equals(user.club_id)){
 			auth(event.author_id.equals(user._id) || user.access.club > 0);
@@ -514,112 +499,207 @@ router.get('/:eventId', checkEventAuth(
 		}else{
 			auth(event.status == 2 && user.access.district > 0)
 		}
-	},
+	});
+}), function(req, res, next){
+	var event = res.locals.event;
 
-	function(req, res, next){
-		res.send(res.locals.event);
+	var members = new Set();
+	if(event.chair_id !== ""){
+		members.add(String(event.chair_id));
 	}
-));
 
-router.patch('/:eventId', checkEventAuth({author_id: 1, club_id: 1, status: 1, time: 1},
-	function(req, res, auth){
-		var user = res.locals.user;
-		var event = res.locals.event;
-
-		if(event.club_id.equals(user.club_id)){
-			if(user.access.club > 0){
-				auth(event.status != 2);
-			}else{
-				auth(event.status == 0 && event.author_id.equals(user._id));
-			}
-		}else{
-			auth(false);
-		}
-	}, 
-
-	function(req, res, next){
-		var body = req.body;
-		if(Object.keys(body).length > 0){
-			validateFields(res.locals.user.club_id, body, function(data, errors){
-				if(Object.keys(data).length > 0){
-					var eventQuery = {_id: res.locals.event._id};
-					app.db.collection("events").updateOne(eventQuery, {$set: data}, function(err, updateRes){
-						if(err) throw err;
-						res.send({success: true, auth: true, warning: errors});
-					});
-				}
-			});
-
-		}else{
-			res.send({success: true, auth: true});
-		}
+	if(event.author_id !== ""){
+		members.add(String(event.author_id));
 	}
-));
 
-router.delete('/:eventId', checkEventAuth({club_id: 1, author_id: 1, status: 1},
-	function(req, res, auth){
-		var user = res.locals.user;
-		var event = res.locals.event;
-
-		if(event.club_id.equals(user.club_id)){
-			if(user.access.club > 0){
-				auth(event.status != 2);
-			}else{
-				auth(event.status == 0 && event.author_id.equals(user._id));
-			}
-		}else{
-			auth(false);
+	var overrideHours = {};
+	event.overrideHours.forEach(function(override){
+		if("attendee_id" in override){
+			members.add(String(override.attendee_id));
+			overrideHours[override.attendee_id] = override;
 		}
-	}, 
+	});
 
-	function(req, res, next){
-		var query = {_id: res.locals.event._id};
-		app.db.collection("events").deleteOne(query, function(err, obj){
-			if(err) throw err;
-			res.send({success: true, auth: true});
+	var attendees = new Set();
+	event.attendees.forEach(function(attendee_id){
+		attendees.add(String(attendee_id));
+		members.add(String(attendee_id));
+	});
+
+	app.get("membersRoute").getMembers(members, {name: 1}, function(err, members){
+		if(err) throw err;
+
+		var verifiedOverrideHours = [];
+		var verifiedAttendees = [];
+
+		members.forEach(function(member){
+			if(member._id.equals(event.chair_id)){
+				event.chair = member;
+			}
+
+			if(member._id.equals(event.author_id)){
+				event.author = member;
+			}
+
+			if(member._id in overrideHours){
+				var verifiedOverrideHour = overrideHours[member._id];
+				delete verifiedOverrideHour.attendee_id;
+				verifiedOverrideHours.push({
+					attendee: member,
+					service: verifiedOverrideHours.service,
+					leadership: verifiedOverrideHours.leadership,
+					fellowship: verifiedOverrideHours.fellowship
+				});
+			}
+
+			if(attendees.has(String(member._id))){
+				verifiedAttendees.push(member);
+			}
 		});
-	}
-));
 
-router.patch('/:eventId/submit', checkEventAuth({club_id: 1, author_id: 1, status: 1},
-	function(req, res, auth){
-		var user = res.locals.user;
-		var event = res.locals.event;
-		auth(event.club_id.equals(user.club_id) && event.status != 2 && (user.access.club > 0 || event.author_id.equals(user._id)));
-	}, 
-
-	function(req, res, next){
-		var body = req.body;
-		if(Object.keys(body).length > 0){
-			if("submit" in body){
-				body.submit = 
-					body.submit === 'true' ? true
-					: body.submit === 'false' ? false
-					: body.submit;
-
-				if(body.submit === true || body.submit === false){
-					var query = {_id: res.locals.event._id};
-					var update = {$set: {status: body.submit ? 1 : 0}};
-					app.db.collection("events").updateOne(query, update, function(err, updateRes){
-						if(err) throw err;
-						res.send({success: true, auth: true});
-					});
-				}else{
-					res.send({success: false, auth: true, error: {submit: "Must be a boolean value"}});
+		if(!("chair" in event)){
+			event.chair = {
+				_id: "",
+				name: {
+					first: "Invalid",
+					last: "Member"
 				}
+			};
+		}
+
+		if(!("author" in event)){
+			event.author = {
+				_id: "",
+				name: {
+					first: "Invalid",
+					last: "Member"
+				}
+			};
+		}
+
+		delete event.chair_id;
+		delete event.author_id;
+		event.overrideHours = verifiedOverrideHours;
+		event.attendees = verifiedAttendees;
+		res.send(res.locals.event);
+	});
+});
+
+router.patch("/:eventId", checkAuth(function(req, res, auth){
+	getEvent(req.params.eventId, {club_id: 1, status: 1, author_id: 1}, function(event){
+		var user = res.locals.user;
+		res.locals.event = event;
+		if(event == null){
+			auth(false);
+			return;
+		}
+
+		if(event.club_id.equals(user.club_id)){
+			if(user.access.club > 0){
+				auth(event.status < 2);
 			}else{
-				res.send({success: false, auth: true, error: {submit: "Required"}});
+				auth(event.status == 0 && event.author_id.equals(user._id));
+			}
+		}else{
+			auth(false);
+		}
+	});
+}), function(req, res, next){
+	var body = req.body;
+	if(Object.keys(body).length > 0){
+		validateFields(res.locals.user.club_id, body, function(data, errors){
+			if(Object.keys(data).length > 0){
+				var eventQuery = {_id: res.locals.event._id};
+				app.db.collection("events").updateOne(eventQuery, {$set: data}, function(err, updateRes){
+					if(err) throw err;
+					res.send({success: true, auth: true, warning: errors});
+				});
+			}
+		});
+
+	}else{
+		res.send({success: true, auth: true});
+	}	
+});
+
+router.delete("/:eventId", checkAuth(function(req, res, auth){
+	getEvent(req.params.eventId, {club_id: 1, status: 1, author_id: 1}, function(event){
+		var user = res.locals.user;
+		res.locals.event = event;
+		if(event == null){
+			auth(false);
+			return;
+		}
+
+		if(event.club_id.equals(user.club_id)){
+			if(user.access.club > 0){
+				auth(event.status < 2);
+			}else{
+				auth(event.status == 0 && event.author_id.equals(user._id));
+			}
+		}else{
+			auth(false);
+		}
+
+	});
+}), function(req, res, next){
+	var query = {_id: res.locals.event._id};
+	app.db.collection("events").deleteOne(query, function(err, obj){
+		if(err) throw err;
+		res.send({success: true, auth: true});
+	});	
+});
+
+router.patch("/:eventId/submit", checkAuth(function(req, res, auth){
+	getEvent(req.params.eventId, {club_id: 1, status: 1, author_id: 1}, function(event){
+		var user = res.locals.user;
+		res.locals.event = event;
+		if(event == null){
+			auth(false);
+			return;
+		}
+
+		if(event.club_id.equals(user.club_id) && event.status != 2){
+			auth(user.access.club > 0 || event.author_id.equals(user._id));
+		}else{
+			auth(false);
+		}
+	});
+}), function(req, res, next){
+	var body = req.body;
+	if(Object.keys(body).length > 0){
+		if("submit" in body){
+			body.submit = 
+				body.submit === 'true' ? true
+				: body.submit === 'false' ? false
+				: body.submit;
+
+			if(body.submit === true || body.submit === false){
+				var query = {_id: res.locals.event._id};
+				var update = {$set: {status: body.submit ? 1 : 0}};
+				app.db.collection("events").updateOne(query, update, function(err, updateRes){
+					if(err) throw err;
+					res.send({success: true, auth: true});
+				});
+			}else{
+				res.send({success: false, auth: true, error: {submit: "Must be a boolean value"}});
 			}
 		}else{
 			res.send({success: false, auth: true, error: {submit: "Required"}});
 		}
+	}else{
+		res.send({success: false, auth: true, error: {submit: "Required"}});
 	}
-));
+});
 
-router.patch('/:eventId/confirm', checkEventAuth({club_id: 1, status: 1, hoursPerAttendee: 1, attendees: 1, overrideHours: 1, "time.start": 1},
-	function(req, res, auth){
+router.patch("/:eventId/confirm", checkAuth(function(req, res, auth){
+	getEvent(req.params.eventId, {club_id: 1, status: 1, author_id: 1}, function(event){
 		var user = res.locals.user;
-		var event = res.locals.event;
+		res.locals.event = event;
+		if(event == null){
+			auth(false);
+			return;
+		}
 
 		var editableDate = false;
 
@@ -637,55 +717,59 @@ router.patch('/:eventId/confirm', checkEventAuth({club_id: 1, status: 1, hoursPe
 		}
 
 		auth(editableDate && event.club_id.equals(user.club_id) && user.access.club > 0 && event.status > 0);
+	});
 
-	}, 
-
-	function(req, res, next){
-		var body = req.body;
-		if(Object.keys(body).length > 0){
-			if("confirm" in body){
-				body.confirm = 
-					body.confirm === 'true' ? true
-					: body.confirm === 'false' ? false
-					: body.confirm;
-					
-				if(body.confirm === true || body.confirm === false){
-					var event = res.locals.event;
-					var query = {_id: event._id};
-					var update = {$set: {status: body.confirm ? 2 : 1}};
-					if(!body.confirm){
-						update.$unset = {totals: 1};
-					}else{
-						var totals = {
-							service: event.hoursPerAttendee.service * (event.attendees.length - event.overrideHours.length),
-							leadership: event.hoursPerAttendee.leadership * (event.attendees.length - event.overrideHours.length),
-							fellowship: event.hoursPerAttendee.fellowship * (event.attendees.length - event.overrideHours.length)
-						}
-
-						for(var i in event.overrideHours){
-							totals.service += event.overrideHours[i].service;
-							totals.leadership += event.overrideHours[i].leadership;
-							totals.fellowship += event.overrideHours[i].fellowship;
-						}
-
-						totals.members = event.attendees.length;
-						update.$set.totals = totals;
+}), function(req, res, next){
+	var body = req.body;
+	if(Object.keys(body).length > 0){
+		if("confirm" in body){
+			body.confirm = 
+				body.confirm === 'true' ? true
+				: body.confirm === 'false' ? false
+				: body.confirm;
+				
+			if(body.confirm === true || body.confirm === false){
+				var event = res.locals.event;
+				var query = {_id: event._id};
+				var update = {$set: {status: body.confirm ? 2 : 1}};
+				if(!body.confirm){
+					update.$unset = {totals: 1};
+				}else{
+					var totals = {
+						service: event.hoursPerAttendee.service * (event.attendees.length - event.overrideHours.length),
+						leadership: event.hoursPerAttendee.leadership * (event.attendees.length - event.overrideHours.length),
+						fellowship: event.hoursPerAttendee.fellowship * (event.attendees.length - event.overrideHours.length)
 					}
 
-					app.db.collection("events").updateOne(query, update, function(err, updateRes){
-						if(err) throw err;
-						res.send({success: true, auth: true});
-					});
-				}else{
-					res.send({success: false, auth: true, error: {confirm: "Must be a boolean value"}});
+					for(var i in event.overrideHours){
+						totals.service += event.overrideHours[i].service;
+						totals.leadership += event.overrideHours[i].leadership;
+						totals.fellowship += event.overrideHours[i].fellowship;
+					}
+
+					totals.members = event.attendees.length;
+					update.$set.totals = totals;
 				}
+
+				app.db.collection("events").updateOne(query, update, function(err, updateRes){
+					if(err) throw err;
+					res.send({success: true, auth: true});
+				});
 			}else{
-				res.send({success: false, auth: true, error: {confirm: "Required"}});
+				res.send({success: false, auth: true, error: {confirm: "Must be a boolean value"}});
 			}
 		}else{
 			res.send({success: false, auth: true, error: {confirm: "Required"}});
 		}
+	}else{
+		res.send({success: false, auth: true, error: {confirm: "Required"}});
 	}
-));
+});
 
-module.exports = router;
+module.exports = function(newApp){
+	app = newApp;
+	utils = require('mrf-utils')(app);
+	return {
+		router: router,
+	};
+}

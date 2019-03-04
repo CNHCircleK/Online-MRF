@@ -1,20 +1,16 @@
 var express = require('express');
 var router = express.Router();
+
 var app;
 var utils;
 
 var mongo = require('mongodb');
 var ObjectId = mongo.ObjectId;
+
 var mongoSanitize = require('express-mongo-sanitize');
 
-var bcrypt = require('bcrypt');
 var auth = require("../auth");
-
-router.all('*', function(req, res, next){
-	app = req.app;
-	utils = require('mrf-utils')(app);
-	next();	
-});
+var bcrypt = require('bcrypt');
 
 router.post('/', function(req, res, next){
 	var body = req.body;
@@ -26,52 +22,79 @@ router.post('/', function(req, res, next){
 		}
 	});
 
-	if(Object.keys(errors).length == 0){
-		var registrationId = body['registration'].substring(0, 24);
-		var secret = body['registration'].substring(24);
+	if(Object.keys(errors).length > 0){	
+		res.send({success: false, auth: true, error: errors});
+		return
+	}
 
-		if(!ObjectId.isValid(registrationId)){
-			res.send({success: false, auth: true, error: "Invalid registration code"});
+	var registrationId = body['registration'].substring(0, 24);
+	var secret = body['registration'].substring(24);
+
+	if(!ObjectId.isValid(registrationId)){
+		res.send({success: false, auth: true, error: {registration: "Expired or not found"}});
+		return;
+	}
+
+	var registrationQuery = {"registration._id": ObjectId(registrationId), "username": {$exists: false}};
+	app.db.collection("members").findOne(registrationQuery, function(err, member){
+		if(err) throw err;
+
+		if(member == null || !("registration" in member) || member.registration.getTime() > new Date().getTime()){
+			res.send({success: false, auth: true, error: {registration: "Expired or not found"}});
 			return;
 		}
 
-		var registrationQuery = {"registration._id": ObjectId(registrationId), "username": {$exists: false}}
-		app.db.collection("members").findOne(registrationQuery, function(err, member){
+		bcrypt.compare(secret, member.registration.secret, function(err, matched){
 			if(err) throw err;
 
-			if(member != null){
-				bcrypt.compare(secret, member.registration.secret, function(err, matched){
-					if(err) throw err;
-
-					if(matched){
-						bcrypt.hash(body['password'], app.get('config').bcryptSaltRounds, function(err, hash){
-							if(err) throw err;
-
-							// TODO: Check Validity of username and email
-							var setData = {$set: mongoSanitize.sanitize({
-								email: body['email'],
-								username: body['username'],
-								password: hash
-							})};
-
-							app.db.collection("members").updateOne(registrationQuery, setData, function(err, updateRes){
-								if(err) throw err;
-								auth.signToken(app, member, function(err, token){
-									res.send({success: true, auth: true, result: token});
-								});
-							});
-						});
-					}else{
-						res.send({success: false, auth: true, error: "Invalid registration code"});
-					}
-				});
-			}else{
-				res.send({success: false, auth: true, error: "Invalid registration code"});
+			if(!matched){
+				res.send({success: false, auth: true, error: {registration: "Expired or not found"}});
+				return;
 			}
+
+			var errors = {};
+			var email = body["email"];
+			var password = body["password"];
+
+			if(!(/^\S+@\S+\.\S+$/.test(email))){
+				errors.email = "Invalid format";
+			}
+
+			if(password.length < 6){
+				errors.password = "Must be more than 6 characters";
+			}
+
+			if(Object.keys(errors).length > 0){
+				res.send({success: false, auth: true, error: errors});
+				return;
+			}
+
+			bcrypt.hash(password, app.get('config').bcryptSaltRounds, function(err, hash){
+				if(err) throw err;
+				var setData = {$set: mongoSanitize.sanitize({
+					email: email,
+					password: hash
+				})};
+
+				app.db.collection("members").updateOne(registrationQuery, setData, function(err, updateRes){
+					if(err) throw err;
+					auth.signToken(app, member, function(err, token){
+						if(err) throw err;
+						res.send({success: true, auth: true, result: token});
+					});
+				});
+			});
+			
 		});
-	}else{
-		res.send({success: false, auth: true, error: errors});
-	}
+		
+	});
+	
 });
 
-module.exports = router;
+module.exports = function(newApp){
+	app = newApp;
+	utils = require('mrf-utils')(app);
+	return {
+		router: router,
+	};
+}

@@ -3,11 +3,10 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
+var fs = require('fs');
 
 var MongoClient = require('mongodb').MongoClient;
 var db;
-
-var config = require('./config');
 
 var app = express();
 
@@ -23,26 +22,27 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(function(req, res, next) {
-	app.set('config', config);
-	next();
-});
+var config = require('./config');
+app.set('config', config);
 
 app.use(require('cors')());
 
+app.disable('etag');
+
 function route(routeName, routerLocation = null){
-	var router = require('./routes/' + (routerLocation != null ? routerLocation : routeName));
-	app.use('/' + routeName, router);
+	var route = require('./routes/' + (routerLocation != null ? routerLocation : routeName))(app);
+	app.set(routeName + "Route", route);
+	app.use('/' + routeName, route.router);
 }
 
-route('', 'index');
 route('signup');
 route('signin');
 route('members');
 route('events');
 route('clubs');
 route('divisions');
-route('district');
+route('tags');
+route('mrfs');
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
