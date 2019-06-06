@@ -84,13 +84,17 @@
 					}
 				},
 				{
-					date: new Date().toISOString(),
+					advisorAttended: {
+						faculty: false,
+						kiwanis: false
+					},
 					attendance: {
-						numMembers: 100,
-						numNonHomeMembers: 2,
-						numKiwanis: 3,
-						numGuests: 4
-					}
+						numGuests: 0,
+						numKiwanis: 0,
+						numMembers: 0,
+						numNonHomeMembers: 0
+					},
+					date: "1999-10-24T07:00:00.000Z"
 				}
 			],
 			boardMeetings: [
@@ -106,6 +110,23 @@
 					attendance:{
 						numBoard: 44,
 					}
+				}
+			],
+
+			events:[
+				{
+					name: "MRF EVENT",
+					time: {
+						start: new Date().toISOString(),
+						end: new Date().toISOString()
+					},
+					totals: {
+						service: 100,
+						fellowship: 300,
+						leadership: 399,
+						members: 1000
+					},
+					tags: ["5c7ef30ffab1cc56773612cc", "asds"]
 				}
 			],
 
@@ -138,7 +159,7 @@
 				if(res.success){
 					token = res.result;
 					$.ajax({
-						url: "http://localhost:3000/members/5b6d21b4a658cb1b960249f0/events",
+						url: "http://localhost:3000/clubs/5b6d2054f176363426fe5b93/mrfs/2019/03",
 						type: 'get', 
 						beforeSend: function(req){
 							req.setRequestHeader("Authorization", "Basic " + token);

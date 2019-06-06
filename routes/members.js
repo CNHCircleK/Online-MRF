@@ -13,32 +13,48 @@ var bcrypt = require('bcrypt');
 
 function getMember(memberId, projection, callback){
 	if(!ObjectId.isValid(memberId)){
-		callback(null,null);
+		callback(null);
 		return;
 	}
 
 	var query = {"_id": ObjectId(memberId)};
-	app.db.collection("members").findOne(query, {projection: projection}, callback);
+	app.db.collection("members").findOne(query, {projection: projection}, function(err, member){
+		if(err) throw err;
+		callback(member);
+	});
 }
 
-function getMembers(memberIds, projection, callback){
-	var members = {};
+function getMembers(clubId, memberIds, projection, callback){
+	var members = [];
 	memberIds.forEach(function(memberId){
 		if(ObjectId.isValid(memberId)){
-			members[memberId] = {"_id": ObjectId(memberId)};
+			members.push({"_id": ObjectId(memberId)});
 		}
 	});
-	if(Object.keys(members).length > 0){
-		var query = {$or: Object.values(members)};
-		app.db.collection("members").find(query, {projection: projection}).toArray(callback);		
+
+	if(members.length > 0){
+		var query = {$or: members};
+		if(clubId != null){
+			if(ObjectId.isValid(clubId)){
+				query.club_id = ObjectId(clubId);
+			}else{
+				callback([]);
+				return;
+			}
+		}
+		
+		app.db.collection("members").find(query, {projection: projection}).toArray(function(err, members){
+			if(err) throw err;
+			callback(members);
+		});		
 	}else{
-		callback(null, null);
+		callback(null);
 	}
 
 }
 
 router.get("/:memberId", checkAuth(function(req, res, auth){
-	getMember(req.params.memberId, {access: 1, club_id: 1, division_id: 1, email: 1, name: 1}, function(err, member){
+	getMember(req.params.memberId, {access: 1, club_id: 1, division_id: 1, email: 1, name: 1}, function(member){
 		var user = res.locals.user;
 		res.locals.member = member;
 		if(member == null){
@@ -55,7 +71,7 @@ router.get("/:memberId", checkAuth(function(req, res, auth){
 });
 
 router.get("/:memberId/events", checkAuth(function(req, res, auth){
-	getMember(req.params.memberId, {"_id": 1, club_id: 1}, function(err, member){
+	getMember(req.params.memberId, {"_id": 1, club_id: 1}, function(member){
 		var user = res.locals.user;
 		res.locals.member = member;
 		if(member == null){
@@ -77,7 +93,7 @@ router.get("/:memberId/events", checkAuth(function(req, res, auth){
 });
 
 router.get("/:memberId/registration", checkAuth(function(req, res, auth){
-	getMember(req.params.memberId, {password: 1}, function(err, member){
+	getMember(req.params.memberId, {password: 1, club_id: 1, access: 1}, function(member){
 		var user = res.locals.user;
 		res.locals.member = member;
 		if(member == null){
@@ -85,7 +101,7 @@ router.get("/:memberId/registration", checkAuth(function(req, res, auth){
 			return;
 		}
 
-		auth(member.club_id.equals(user.club_id) && user.access.club >= member.access.club.level);
+		auth(user.club_id.equals(member.club_id) && user.access.club >= member.access.club.level);
 	});	
 }), function(req, res, next){
 	if(res.locals.member.password != null){

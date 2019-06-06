@@ -27,6 +27,7 @@ module.exports = {
 			if(token != null){
 				token = String(token).split(" ");
 				if(token.length < 2){
+					res.status(405);
 					res.send({success: false, auth: false});
 					return;
 				}
@@ -34,6 +35,7 @@ module.exports = {
 				token = token[1];
 				jwt.verify(token, req.app.get("config").tokenSecret, function(err, decoded) {
 		  			if(err){
+		  				res.status(405);
 		  				res.send({success: false, auth: false});
 		  			}else{
 		  				decoded._id = ObjectId(decoded._id);
@@ -47,12 +49,14 @@ module.exports = {
 		  					}else if(auth && !success){
 		  						res.send({success: false, auth: true, error: error})
 		  					}else{
+		  						res.status(405);
 		  						res.send({success: false, auth: false});
 		  					}
 		  				});
 		  			}
 				});
 			}else{
+				res.status(405);
 				res.send({success: false, auth: false});
 			}
 		}

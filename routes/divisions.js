@@ -81,7 +81,6 @@ router.delete("/:divisionId", checkAuth(function(req, res, auth){
 	var user = res.locals.user;
 	if(user.access.district > 0){
 		getDivision(req.params.divisionId, {_id: 1}, function(division){
-			if(err) throw err;
 			if(division == null){
 				auth(false);
 				return;
@@ -141,7 +140,7 @@ router.post("/:divisionId/clubs", checkAuth(function(req, res, auth){
 		res.locals.division = division;
 		var user = res.locals.user;
 
-		auth(division._id.equals(user.division_id) && user.access.division > 0);		
+		auth((division._id.equals(user.division_id) && user.access.division > 0) || user.access.district > 0);		
 	});
 	
 }), function(req, res, next){
@@ -186,6 +185,88 @@ router.post("/:divisionId/clubs", checkAuth(function(req, res, auth){
 	}else{
 		res.send({success: false, auth: true, error: errors});
 	}	
+});
+
+router.get("/:divisionId/administration", checkAuth(function(req, res, auth){
+	getDivision(req.params.divisionId, {division_id: 1}, function(club){
+		if(division == null){
+			auth(false);
+			return;
+		}
+
+		res.locals.division = division;
+		var user = res.locals.user;
+
+		if(user.division_id.equals(division._id)){
+			auth(true);
+		}else{
+			auth(user.access.district > 0);
+		}	
+	});
+}), function(req, res, next){
+	var division = res.locals.division;
+	var user = res.locals.user;
+
+	var query = {division_id: division._id, "access.division.level" : {$gt: 0}};
+	var projection = {name: 1, "access.division": 1, email: 1};
+
+	app.db.collection("members").find(query, {projection: projection}).sort([['access.division.level', -1], ['name.last', 1], ['name.first', 1]]).toArray(function(err, members){
+		if(err) throw err;
+		res.send({success: true, auth: true, result: members});
+	});			
+});
+
+router.patch("/:divisionId/administration", checkAuth(function(req, res, auth){
+	getDivision(req.params.divisionId, {_id: 1}, function(division){
+		if(division == null){
+			auth(false);
+			return;
+		}
+
+		res.locals.division = division;
+		var user = res.locals.user;
+
+		if(user.division_id.equals(division._id)){
+			auth(user.access.division > 0);
+		}else{
+			auth(user.access.district > 0);
+		}
+	});
+}), function(req, res, next){
+	var body = req.body;
+	var errors = {};
+
+	utils.checkIn(body, ["memberId", "access"], function(elem, res){
+		if(!res){
+			errors[elem] = "Required";
+		}else if(elem == "access" && (!utils.isInt(body[elem]) || body[elem] < 0 || body[elem] > 1)){
+			errors[elem] = "Invalid Access Level";
+		}
+	});
+
+	if(Object.keys(errors).length == 0){
+		if(!ObjectId.isValid(body.memberId)){
+			res.send({success: false, auth: true, error: {memberId: "Unable to find this member in the division"}});
+		}else{
+			var query = {_id: ObjectId(body.memberId), division_id: res.locals.division._id};
+			var updates = {"access.division.level": parseFloat(body.access)};
+			if("position" in body){
+				updates["access.division.position"] = mongoSanitize.sanitize(String(body.position))
+			}
+
+			app.db.collection("members").updateOne(query, {$set: updates}, function(err, updateRes){
+				if(err) throw err;
+				if(updateRes.matchedCount > 0){
+					res.send({success: true, auth: true});
+				}else{
+					res.send({success: false, auth: true, error: {memberId: "Unable to find this member in the club"}});
+				}
+				
+			});
+		}
+	}else{
+		res.send({success: false, auth: true, error: errors});
+	}		
 });
 
 router.get("/:divisionId/mrfs/:year/:month", checkAuth(function(req, res, auth){
@@ -233,21 +314,25 @@ router.get("/:divisionId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 	getClubs(res.locals.division._id, {name: 1, _id: 1}, function(clubs){
 		var year = Number(req.params.year);
 		var month = Number(req.params.month);
+		var query = {year: year, month: month, $or: []};
 
 		var clubNames = {};
 		var clubIds = clubs.map(function(club){ 
+			query.$or.push({club_id: ObjectId(clubId)});
 			clubNames[String(club._id)] = club.name;
 			return club._id 
 		});
 
-		app.get("mrfsRoute").getMRF(clubIds, year, month, {club_id: 1}, function(mrf){
-			mrf.forEach(function(clubMRF){
-				clubMRF.club = {name: clubNames[String(clubMRF.club_id)], _id: clubMRF.club_id};
-				delete clubMRF.club_id;
+		app.db.collection("mrfs").find(query, {projection: {club_id: 1}}).toArray(function(mrfErr, mrfs){
+			if(mrfErr) throw err;
+			mrfs.forEach(function(mrf){
+				mrf.club = {name: clubNames[String(mrf.club_id)], _id: mrf.club_id};
+				delete mrf.club_id
 			});
 
 			res.send({success: true, auth: true, result: mrf});
-		})
+		});
+
 	});
 });
 

@@ -13,12 +13,15 @@ var utils;
 
 function getEvent(eventId, projection, callback){
 	if(!ObjectId.isValid(eventId)){
-		callback(null,null);
+		callback(null);
 		return;
 	}
 
 	var query = {"_id": ObjectId(eventId)};
-	app.db.collection("events").findOne(query, {projection: projection}, callback);
+	app.db.collection("events").findOne(query, {projection: projection}, function(err, event){
+		if(err) throw err;
+		callback(event); 
+	});
 }
 
 
@@ -118,13 +121,16 @@ function validateFields(club_id, data, callback){
 
 	if("attendees" in data){
 		if(Array.isArray(data.attendees)){
+			validData.attendees = [];
+			validData.unverifiedAttendees = [];
+			
 			for(var i = 0; i < data.attendees.length; i++){
 				if(ObjectId.isValid(data.attendees[i])){
 					potentialAttendees[data.attendees[i]] = true;
 					numPotentialAttendees ++;
 					validateUsers[data.attendees[i]] = {_id: ObjectId(data.attendees[i])};
 				}else{
-					errors.attendees = "Some attendees are invalid";
+					validData.unverifiedAttendees.push(String(mongoSanitize.sanitize(data.attendees[i])));
 				}
 			}
 		}else{
@@ -440,7 +446,6 @@ router.post("/", checkAuth(function(req, res, auth){
 	validateFields(res.locals.user.club_id, body, function(data, errors){
 		var newData = {
 			club_id: res.locals.user.club_id,
-			division_id: res.locals.user.division_id,
 			status: "status" in data ? data.status : 0,
 			name: "name" in data ? data.name : "",
 			author_id: res.locals.user._id,
@@ -453,6 +458,7 @@ router.post("/", checkAuth(function(req, res, auth){
 			contact: "contact" in data ? data.contact : "",
 			tags: "tags" in data ? data.tags : [],
 			attendees: "attendees" in data ? data.attendees : [],
+			unverifiedAttendees: "unverifiedAttendees" in data ? data.unverifiedAttendees : [],
 			hoursPerAttendee: "hoursPerAttendee" in data ? data.hoursPerAttendee : {
 				service: 0.0,
 				leadership: 0.0,
@@ -484,17 +490,18 @@ router.post("/", checkAuth(function(req, res, auth){
 });
 
 router.get("/:eventId", checkAuth(function(req, res, auth){
-	getEvent(req.params.eventId, {}, function(err, event){
+	getEvent(req.params.eventId, {attendees: 1, unverifiedAttendees: 1, author_id: 1, categories: 1, chair_id: 1, club_id: 1, comments: 1, contact: 1, drivers: 1, fundraised: 1, hoursPerAttendee: 1, kfamAttendance: 1, location: 1, name: 1, overrideHours: 1, status: 1, tags: 1, time: 1}, function(event){
 		if(event == null){
 			auth(false);
+			return;
 		}
-		
+
 		var user = res.locals.user;
 		res.locals.event = event;
 
-		if(event.club_id.equals(user.club_id)){
-			auth(event.author_id.equals(user._id) || user.access.club > 0);
-		}else if(event.division_id.equals(user.division_id)){
+		if(user.club_id.equals(event.club_id)){
+			auth(user._id.equals(event.author_id) || user.access.club > 0);
+		}else if(user.division_id.equals(event.division_id)){
 			auth(event.status == 2 && user.access.division > 0)
 		}else{
 			auth(event.status == 2 && user.access.district > 0)
@@ -526,9 +533,7 @@ router.get("/:eventId", checkAuth(function(req, res, auth){
 		members.add(String(attendee_id));
 	});
 
-	app.get("membersRoute").getMembers(members, {name: 1}, function(err, members){
-		if(err) throw err;
-
+	app.get("membersRoute").getMembers(null, members, {name: 1}, function(members){
 		var verifiedOverrideHours = [];
 		var verifiedAttendees = [];
 
@@ -581,7 +586,27 @@ router.get("/:eventId", checkAuth(function(req, res, auth){
 		delete event.author_id;
 		event.overrideHours = verifiedOverrideHours;
 		event.attendees = verifiedAttendees;
-		res.send(res.locals.event);
+
+		if(!("club_id" in event)){
+			res.send({success: true, auth: true, result: event});
+		}
+	});
+
+	app.get("clubsRoute").getClub(event.club_id, {name: 1}, function(club){
+		if(club == null){
+			event.club = {
+				name: "Invalid Club",
+				_id: ""
+			};
+		}else{
+			event.club = club;
+		}
+
+		delete event.club_id;
+
+		if(!("author_id" in event)){
+			res.send({success: true, auth: true, result: event});
+		}
 	});
 });
 
@@ -594,11 +619,11 @@ router.patch("/:eventId", checkAuth(function(req, res, auth){
 			return;
 		}
 
-		if(event.club_id.equals(user.club_id)){
+		if(user.club_id.equals(event.club_id)){
 			if(user.access.club > 0){
 				auth(event.status < 2);
 			}else{
-				auth(event.status == 0 && event.author_id.equals(user._id));
+				auth(event.status == 0 && user._id.equals(event.author_id));
 			}
 		}else{
 			auth(false);
@@ -612,7 +637,11 @@ router.patch("/:eventId", checkAuth(function(req, res, auth){
 				var eventQuery = {_id: res.locals.event._id};
 				app.db.collection("events").updateOne(eventQuery, {$set: data}, function(err, updateRes){
 					if(err) throw err;
-					res.send({success: true, auth: true, warning: errors});
+					if(Object.keys(errors).length > 0){
+						res.send({success: true, auth: true, warning: errors});
+					}else{
+						res.send({success: true, auth: true});
+					}
 				});
 			}
 		});
@@ -631,11 +660,11 @@ router.delete("/:eventId", checkAuth(function(req, res, auth){
 			return;
 		}
 
-		if(event.club_id.equals(user.club_id)){
+		if(user.club_id.equals(event.club_id)){
 			if(user.access.club > 0){
 				auth(event.status < 2);
 			}else{
-				auth(event.status == 0 && event.author_id.equals(user._id));
+				auth(event.status == 0 && user._id.equals(event.author_id));
 			}
 		}else{
 			auth(false);
@@ -659,8 +688,8 @@ router.patch("/:eventId/submit", checkAuth(function(req, res, auth){
 			return;
 		}
 
-		if(event.club_id.equals(user.club_id) && event.status != 2){
-			auth(user.access.club > 0 || event.author_id.equals(user._id));
+		if(user.club_id.equals(event.club_id) && event.status != 2){
+			auth(user.access.club > 0 || user._id.equals(event.author_id));
 		}else{
 			auth(false);
 		}
@@ -693,7 +722,7 @@ router.patch("/:eventId/submit", checkAuth(function(req, res, auth){
 });
 
 router.patch("/:eventId/confirm", checkAuth(function(req, res, auth){
-	getEvent(req.params.eventId, {club_id: 1, status: 1, author_id: 1}, function(event){
+	getEvent(req.params.eventId, {club_id: 1, status: 1, author_id: 1, time: 1, hoursPerAttendee: 1, overrideHours: 1, attendees: 1}, function(event){
 		var user = res.locals.user;
 		res.locals.event = event;
 		if(event == null){
@@ -716,7 +745,7 @@ router.patch("/:eventId/confirm", checkAuth(function(req, res, auth){
 			}
 		}
 
-		auth(editableDate && event.club_id.equals(user.club_id) && user.access.club > 0 && event.status > 0);
+		auth(event.club_id.equals(user.club_id) && user.access.club > 0 && event.status > 0);
 	});
 
 }), function(req, res, next){

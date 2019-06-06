@@ -4,6 +4,7 @@ var app;
 
 var mongo = require('mongodb');
 var ObjectId = mongo.ObjectId;
+var mongoSanitize = require('express-mongo-sanitize');
 
 var checkAuth = require("../auth").checkAuth;
 var utils;
@@ -17,11 +18,37 @@ function getTag(tagId, projection, callback){
 	app.db.collection("tags").findOne(query, {projection: projection}, callback);	
 }
 
+function getTags(tagIds, projection, callback){
+	var tags = [];
+	tagIds.forEach(function(tagId){
+		if(ObjectId.isValid(tagId)){
+			tags.push({"_id": ObjectId(tagId)});
+		}
+	});
+	if(tags.length > 0){
+		var query = {$or: tags};
+		app.db.collection("tags").find(query, {projection: projection}).toArray(function(err, tags){
+			if(err) throw err;
+			callback(tags);
+		});		
+	}else{
+		callback(null);
+	}
+}
+
 router.get("/", checkAuth(function(req, res, auth){
 	auth(true);
 }),function(req, res, next){
 	var tagProjection = {abbrev: 1, name: 1}
-	app.db.collection("tags").find({active: true}, {projection: tagProjection}).toArray(function(err, tags){
+	var query = {active: true};
+
+	var body = req.query;
+	if("inactive" in body && utils.toBool(body.inactive) === true){
+		query = {};
+		tagProjection.active = 1;
+	}
+
+	app.db.collection("tags").find(query, {projection: tagProjection}).toArray(function(err, tags){
 		if(err) throw err;
 		res.send({success: true, auth: true, result: tags});
 	});
@@ -50,6 +77,8 @@ router.post("/", checkAuth(function(req, res, auth){
 			if(err) throw err;
 			res.send({success: true, auth: true, result: data._id});
 		});
+	}else{
+		res.send({success: false, auth: true, error: errors});
 	}
 });
 
@@ -64,6 +93,8 @@ router.patch("/:tagId", checkAuth(function(req, res, auth){
 			res.locals.tag = tag;
 			auth(true);
 		})
+	}else{
+		auth(false);
 	}
 }),function(req, res, next){
 	var body = req.body;
@@ -75,7 +106,7 @@ router.patch("/:tagId", checkAuth(function(req, res, auth){
 	}
 
 	if("abbrev" in body){
-		data.abbrev = String(body.abbrev);
+		data.abbrev = String(body.abbrev).toUpperCase();
 	}
 
 	if("active" in body){
@@ -87,21 +118,21 @@ router.patch("/:tagId", checkAuth(function(req, res, auth){
 		}
 	}
 
-	if(Object.keys(body).length > 0){
+	if(Object.keys(data).length > 0){
 		var tagQuery = {_id: res.locals.tag._id};
-		app.db.collection("tags").updateOne(tagQuery, data, function(err, updateRes){
+		app.db.collection("tags").updateOne(tagQuery, {$set: mongoSanitize.sanitize(data)}, function(err, updateRes){
 			if(err) throw err;
-			if(Object.keys(warning).length == 0){
+			if(Object.keys(warnings).length == 0){
 				res.send({success: true, auth: true});
 			}else{
-				res.send({success: true, auth: true, warnings: true});
+				res.send({success: true, auth: true, warning: warnings});
 			}
 		});
 	}else{
-		if(Object.keys(warning).length == 0){
+		if(Object.keys(warnings).length == 0){
 			res.send({success: true, auth: true});
 		}else{
-			res.send({success: true, auth: true, warnings: true});
+			res.send({success: true, auth: true, warning: warnings});
 		}
 	}
 });
@@ -111,6 +142,7 @@ module.exports = function(newApp){
 	utils = require('mrf-utils')(app);
 	return {
 		router: router,
-		getTag: getTag
+		getTag: getTag,
+		getTags: getTags
 	};
 }

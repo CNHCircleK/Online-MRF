@@ -16,7 +16,7 @@ router.post('/', function(req, res, next){
 	var body = req.body;
 	var errors = {};
 
-	utils.checkIn(body, ['registration', 'email', 'username', 'password'], function(elem, res){
+	utils.checkIn(body, ['registration', 'email', 'password'], function(elem, res){
 		if(!res){
 			errors[elem] = "Required";
 		}
@@ -35,11 +35,10 @@ router.post('/', function(req, res, next){
 		return;
 	}
 
-	var registrationQuery = {"registration._id": ObjectId(registrationId), "username": {$exists: false}};
+	var registrationQuery = {"registration._id": ObjectId(registrationId), "password": {$exists: false}};
 	app.db.collection("members").findOne(registrationQuery, function(err, member){
 		if(err) throw err;
-
-		if(member == null || !("registration" in member) || member.registration.getTime() > new Date().getTime()){
+		if(member == null){
 			res.send({success: false, auth: true, error: {registration: "Expired or not found"}});
 			return;
 		}

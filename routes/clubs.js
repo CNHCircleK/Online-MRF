@@ -24,17 +24,17 @@ function getClub(clubId, projection, callback){
 	});	
 }
 
-function getMembers(clubId, projection, callback){
+function getClubMembers(clubId, projection, callback){
 	if(!ObjectId.isValid(clubId)){
-		callback(null);
+		callback([]);
 		return;
 	}
 
-	var query = {club_id: ObjectId(clubId)};
-	app.db.collection("members").find(query, {projection: projection}).sort([['name.last', 1], ['name.first', 1]]).toArray(function(err, members){
+	var query = {"club_id": ObjectId(clubId)};		
+	app.db.collection("members").find(query, {projection: projection}).toArray(function(err, members){
 		if(err) throw err;
 		callback(members);
-	});	
+	});
 }
 
 router.delete("/:clubId", checkAuth(function(req, res, auth){
@@ -48,7 +48,7 @@ router.delete("/:clubId", checkAuth(function(req, res, auth){
 		var user = res.locals.user;
 
 		if((user.division_id.equals(club.division_id) && user.access.division > 0) || user.access.district > 0){
-			getMembers(req.params.clubId, {_id: 1}, function(members){
+			getClubMembers(req.params.clubId, {_id: 1}, function(members){
 				if(members.length == 0){
 					auth(true);
 				}else{
@@ -187,7 +187,7 @@ router.get("/:clubId/members", checkAuth(function(req, res, auth){
 		}
 	}
 
-	getMembers(res.locals.club._id, projection, function(members){
+	getClubMembers(res.locals.club._id, projection, function(members){
 		res.send({success: true, auth: true, result: members});
 	});
 });
@@ -206,6 +206,8 @@ router.post("/:clubId/members", checkAuth(function(req, res, auth){
 			auth(user.access.club > 0);
 		}else if(club.division_id.equals(user.division_id)){
 			auth(user.access.division > 0);
+		}else{
+			auth(user.access.district > 0);
 		}
 	});	
 }), function(req, res, next){
@@ -460,13 +462,53 @@ router.get("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 }), function(req, res, next){
 	var year = Number(req.params.year);
 	var month = Number(req.params.month);
-	app.get("mrfsRoute").getMRF(res.locals.club._id, year, month, {}, function(mrf){
-		if(mrf != null){
-			res.send({success: true, auth: true, result: mrf});
+	var query = {year: year, month: month, club_id: res.locals.club._id};
+
+	app.db.collection("mrfs").findOne(query, function(mrfErr, mrf){
+		if(mrfErr) throw err;
+
+		if(mrf == null){
+			mrf = {};
 		}else{
-			res.send({success: false, auth: true});
+			delete mrf._id;
 		}
-	});
+
+		var properMRF = {}
+		var defaults = app.get("mrfsRoute").mrfDefaults(res.locals.club._id, year, month);
+		Object.keys(defaults).forEach(function(key){
+			if(!(key in mrf)){
+				properMRF[key] = defaults[key];
+			}else{
+				properMRF[key] = mrf[key];
+			}
+		});
+
+		mrf = properMRF;
+		var eventQuery = {
+			club_id: res.locals.club._id,
+			status: 2,
+			"time.start": {
+				$gte: new Date(year, month - 1, 1), 
+				$lte: new Date(year, month, 1)
+			}
+		};
+
+		var eventProjection = {name: 1, time: 1, tags: 1, totals: 1};
+		app.db.collection("events").find(eventQuery, {projection: eventProjection}).toArray(function(err, events){
+			if(err) throw err;
+			mrf.importedEvents = events;
+			
+			var checkTags = {};
+			events.forEach(function(event){
+				//TODo
+				checkTags = checkTags.concat()
+			});
+
+			res.send({success: true, auth: true, result: mrf});
+		});	
+
+	});	
+
 });
 
 router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
@@ -486,21 +528,7 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 			var month = req.params.month;
 
 			if(month > 0 && month <= 12){
-				if(club._id.equals(user.club_id)){
-					if(user.access.club > 0){
-						// moment goes from 0 to 11 for months
-						var now = moment();
-						if(now.year() === year){
-							auth(now.month() + 1 === month || now.month() === month);
-						}else if(now.year() === year + 1){
-							auth(month === 12 && now.month() === 0);
-						}else{
-							auth(false);
-						}
-					}else{
-						auth(false);
-					}
-				}	
+				auth(club._id.equals(user.club_id) && user.access.club > 0);
 			}else{
 				auth(false);
 			}
@@ -513,6 +541,9 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 	var data = {};
 	var defaults = app.get("mrfsRoute").mrfDefaults(res.locals.club._id, req.params.year, req.params.month);
 	var warnings = {};
+
+	var year = req.params.year;
+	var month = req.params.month;
 
 	if("goals" in body){
 		data.goals = Array.isArray(body.goals) ? 
@@ -531,7 +562,7 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 				var validMeeting = {};
 				var goodMeeting = true;
 				if(utils.isJSON(meeting)){
-					if(utils.checkIn(meeting, ["date, attendance, advisorAttended"], function(elem, isIn){
+					if(utils.checkIn(meeting, ["date", "attendance", "advisorAttended"], function(elem, isIn){
 						if(!isIn){
 							warnings.meetings = "Some general meetings were unable to be added because of invalid formatting";
 							goodMeeting = true;
@@ -552,7 +583,6 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 							&& "numNonHomeMembers" in meeting.attendance && utils.isInt(meeting.attendance.numNonHomeMembers)
 							&& "numKiwanis" in meeting.attendance && utils.isInt(meeting.attendance.numKiwanis)
 							&& "numGuests" in meeting.attendance && utils.isInt(meeting.attendance.numGuests)){
-
 							validMeeting.attendance = {};
 							validMeeting.attendance.numMembers = Math.max(0, Number(meeting.attendance.numMembers));
 							validMeeting.attendance.numNonHomeMembers = Math.max(0, Number(meeting.attendance.numNonHomeMembers));
@@ -567,8 +597,7 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 						var kiwanis = null;
 						if(utils.isJSON(meeting.advisorAttended)
 							&& "faculty" in meeting.advisorAttended && (faculty = utils.toBool(meeting.advisorAttended.faculty)) != null
-							&& "kiwanis" in meeting.advisorAttended && (faculty = utils.toBool(meeting.advisorAttended.kiwanis)) != null){
-
+							&& "kiwanis" in meeting.advisorAttended && (kiwanis = utils.toBool(meeting.advisorAttended.kiwanis)) != null){
 							validMeeting.advisorAttended = {};
 							validMeeting.advisorAttended.faculty = faculty;
 							validMeeting.advisorAttended.kiwanis = kiwanis;
@@ -606,7 +635,7 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 				if(utils.isJSON(meeting)){
 					if(utils.checkIn(meeting, ["date", "attendance"], function(elem, isIn){
 						if(!isIn){
-							warnings.boardMeetings = "Some general meetings were unable to be added because of invalid formatting";
+							warnings.boardMeetings = "Some board meetings were unable to be added because of invalid formatting";
 							goodMeeting = false;
 						}
 					}));
@@ -616,7 +645,7 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 						if(date.isValid()){
 							validMeeting.date = date.toDate();
 						}else{
-							warnings.boardMeetings = "Some general meetings were unable to be added because of invalid formatting";
+							warnings.boardMeetings = "Some board meetings were unable to be added because of invalid formatting";
 							return;
 						}
 						if(utils.isJSON(meeting.attendance) 
@@ -628,16 +657,16 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 							validMeeting.attendance.numGuests = Math.max(0, Number(meeting.attendance.numGuests));
 
 						}else{
-							warnings.boardMeetings = "Some general meetings were unable to be added because of invalid formatting";
+							warnings.boardMeetings = "Some board meetings were unable to be added because of invalid formatting";
 							return;
 						}
 
 					}else{
-						warnings.boardMeetings = "Some general meetings were unable to be added because of invalid formatting";
+						warnings.boardMeetings = "Some board meetings were unable to be added because of invalid formatting";
 						return;
 					}
 				}else{
-					warnings.boardMeetings = "Some general meetings were unable to be added because of invalid formatting";
+					warnings.boardMeetings = "Some board meetings were unable to be added because of invalid formatting";
 					return;
 				}
 
@@ -708,7 +737,101 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 			defaults.kfamReport = data["kfamReport"];
 		}
 	}
- 
+
+	if("events" in body){
+		if(Array.isArray(body.events)){
+			data["events"] = [];
+			var events = body.events;
+			events.forEach(function(event){
+				if(utils.isJSON(event)){
+					var validEvent = {};
+					if("time" in event && utils.isJSON(event.time) && "start" in event.time && "end" in event.time){
+						var start = moment(String(event.time.start), utils.isoFormat);
+						var end = moment(String(event.time.end), utils.isoFormat);
+
+						if(start.isValid() && end.isValid()){
+							if(start.year() == year && start.month() + 1 == month){
+								validEvent.time = {
+									start: start.toDate(),
+									end: end.toDate()
+								}
+							}else{
+								warnings.events = "Some events had invalid formating."
+								return;
+							}
+							
+						}else{
+							warnings.events = "Some events had invalid formating."
+							return;
+						}
+					}else{
+						warnings.events = "Some events had invalid formating."
+						return;
+					}
+
+					if("name" in event){
+						validEvent.name = String(mongoSanitize.sanitize(event.name));
+					}else{
+						warnings.events = "Some events had invalid formating."
+						return;
+					}
+
+					validEvent.totals = {};
+					if("totals" in event 
+						&& utils.isJSON(event.totals) 
+						&& "service" in event.totals 
+						&& "leadership" in event.totals 
+						&& "fellowship" in event.totals 
+						&& "members" in event.totals){
+
+						if(utils.isInt(event.totals.members) && event.totals.members >= 0){
+							validEvent.totals.members = Number(event.totals.members);
+						}else{
+							validEvent.totals.members = 0;
+						}
+
+						if(utils.isFloat(event.totals.service) && event.totals.service >= 0){
+							validEvent.totals.service = Number(event.totals.service);
+						}else{
+							validEvent.totals.service = 0;
+						}
+
+						if(utils.isFloat(event.totals.leadership) && event.totals.leadership >= 0){
+							validEvent.totals.leadership = Number(event.totals.leadership);
+						}else{
+							validEvent.totals.leadership = 0;
+						}
+
+						if(utils.isFloat(event.totals.fellowship) && event.totals.fellowship >= 0){
+							validEvent.totals.fellowship = Number(event.totals.fellowship);
+						}else{
+							validEvent.totals.fellowship = 0;
+						}	
+					}
+
+					validEvent.tags = [];
+					if("tags" in event){
+						if(Array.isArray(event.tags)){
+							app.get("tagsRoute").getTags(event.tags, {_id: 1}, function(tags){
+								if(tags != null){
+									validEvent.tags = tags.map(function(tag){
+										return tag._id;
+									});
+
+									data.events.push(validEvent);
+									tryAdd();
+								}
+							});
+						}
+					}
+				}else{
+					warnings.events = "Some events had invalid formating."
+					return;
+				}
+			});
+		}
+	}
+
  	/*
 	if("fundraising" in body){
 		var validFundraisers = [];
@@ -727,36 +850,37 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 		defaults.fundraising = validFundraisers;
 	}*/
 
-	var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};
-	var updates = {$set: data};
-	if(Object.keys(data).length > 0){
-		app.db.collection("mrfs").updateOne(query, updates, function(err, updateRes){
-			if(err) throw err;
-			if(updateRes.matchedCount == 0){
-				app.db.collection("mrfs").insert(defaults, function(err, insertRes){
-					if(err) throw err;
+	var tryAdd = function(){
+		var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};
+		var updates = {$set: data};
+		if(Object.keys(data).length > 0){
+			app.db.collection("mrfs").updateOne(query, updates, function(err, updateRes){
+				if(err) throw err;
+				if(updateRes.matchedCount == 0){
+					app.db.collection("mrfs").insert(defaults, function(err, insertRes){
+						if(err) throw err;
+						if(Object.keys(warnings).length > 0){
+							res.send({success: true, auth: true, warning: warnings});
+						}else{
+							res.send({success: true, auth: true});
+						}
+					});
+				}else{
 					if(Object.keys(warnings).length > 0){
 						res.send({success: true, auth: true, warning: warnings});
 					}else{
 						res.send({success: true, auth: true});
 					}
-				});
-			}else{
-				if(Object.keys(warnings).length > 0){
-					res.send({success: true, auth: true, warning: warnings});
-				}else{
-					res.send({success: true, auth: true});
 				}
-			}
-		});	
-	}else{
-		if(Object.keys(warnings).length > 0){
-			res.send({success: true, auth: true, warning: warnings});
+			});	
 		}else{
-			res.send({success: true, auth: true});
+			if(Object.keys(warnings).length > 0){
+				res.send({success: true, auth: true, warning: warnings});
+			}else{
+				res.send({success: true, auth: true});
+			}
 		}
-	}
-	
+	};
 });
 
 module.exports = function(newApp){
@@ -764,5 +888,6 @@ module.exports = function(newApp){
 	utils = require('mrf-utils')(app);
 	return {
 		router: router,
+		getClub: getClub
 	};
 }
