@@ -819,7 +819,6 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 									});
 
 									data.events.push(validEvent);
-									tryAdd();
 								}
 							});
 						}
@@ -831,6 +830,9 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 			});
 		}
 	}
+	console.log("Going to try patching now");
+
+	// tryAdd();
 
  	/*
 	if("fundraising" in body){
@@ -850,7 +852,7 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 		defaults.fundraising = validFundraisers;
 	}*/
 
-	var tryAdd = function(){
+	// var tryAdd = function(){
 		var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};
 		var updates = {$set: data};
 		if(Object.keys(data).length > 0){
@@ -880,7 +882,7 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 				res.send({success: true, auth: true});
 			}
 		}
-	};
+	// };
 });
 
 module.exports = function(newApp){
