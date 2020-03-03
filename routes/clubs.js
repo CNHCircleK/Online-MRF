@@ -426,26 +426,17 @@ router.get("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 				}
 
 				if((club._id.equals(user.club_id) && user.access.club > 0)
-					|| (club.division_id.equals(user.division_id))
+					|| (club.division_id.equals(user.division_id) && user.access.division > 0)
 					|| (user.access.district > 0)){
-
 					var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};
 					var mrfProjection = {communications: 1, dcm: 1, events: 1, goals: 1, kfamReport: 1, meetings: 1, status: 1, submissionTime: 1, updates: 1};
 					app.db.collection("mrfs").findOne(query, {projection: mrfProjection}, function(err, mrf){
 						if(mrf != null){
-							if(mrf.status > 0 || (club._id.equals(user.club_id) && user.access.club > 0)){
-								res.locals.mrf = mrf;
-								auth(true);							
-							}else{
-								auth(false);
-							}
+							res.locals.mrf = mrf;
+							auth(true);
 						}else{
-							if(club._id.equals(user.club_id) && user.access.club > 0){
-								res.locals.mrf = utils.mrfDefaults(res.locals.club._id, res.locals.club.division_id, req.params.year, req.params.month);
-								auth(true);
-							}else{
-								auth(false);
-							}
+							res.locals.mrf = utils.mrfDefaults(res.locals.club._id, res.locals.club.division_id, req.params.year, req.params.month);
+							auth(true);
 						}
 					});
 				}else{
@@ -819,7 +810,6 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 									});
 
 									data.events.push(validEvent);
-									tryAdd();
 								}
 							});
 						}
@@ -849,38 +839,35 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 		data["fundraising"] = validFundraisers;
 		defaults.fundraising = validFundraisers;
 	}*/
-
-	var tryAdd = function(){
-		var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};
-		var updates = {$set: data};
-		if(Object.keys(data).length > 0){
-			app.db.collection("mrfs").updateOne(query, updates, function(err, updateRes){
-				if(err) throw err;
-				if(updateRes.matchedCount == 0){
-					app.db.collection("mrfs").insert(defaults, function(err, insertRes){
-						if(err) throw err;
-						if(Object.keys(warnings).length > 0){
-							res.send({success: true, auth: true, warning: warnings});
-						}else{
-							res.send({success: true, auth: true});
-						}
-					});
-				}else{
+	var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};
+	var updates = {$set: data};
+	if(Object.keys(data).length > 0){
+		app.db.collection("mrfs").updateOne(query, updates, function(err, updateRes){
+			if(err) throw err;
+			if(updateRes.matchedCount == 0){
+				app.db.collection("mrfs").insert(defaults, function(err, insertRes){
+					if(err) throw err;
 					if(Object.keys(warnings).length > 0){
 						res.send({success: true, auth: true, warning: warnings});
 					}else{
 						res.send({success: true, auth: true});
 					}
-				}
-			});	
-		}else{
-			if(Object.keys(warnings).length > 0){
-				res.send({success: true, auth: true, warning: warnings});
+				});
 			}else{
-				res.send({success: true, auth: true});
+				if(Object.keys(warnings).length > 0){
+					res.send({success: true, auth: true, warning: warnings});
+				}else{
+					res.send({success: true, auth: true});
+				}
 			}
+		});	
+	}else{
+		if(Object.keys(warnings).length > 0){
+			res.send({success: true, auth: true, warning: warnings});
+		}else{
+			res.send({success: true, auth: true});
 		}
-	};
+	}
 });
 
 module.exports = function(newApp){

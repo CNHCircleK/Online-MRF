@@ -1,0 +1,5 @@
+.env
+/node_modules/*
+
+# un-exclude our favorite mrf utils module
+!/node_modules/mrf-utils

@@ -101,7 +101,7 @@ router.get("/:memberId/registration", checkAuth(function(req, res, auth){
 			return;
 		}
 
-		auth(user.club_id.equals(member.club_id) && user.access.club >= member.access.club.level);
+		auth((user.club_id.equals(member.club_id) && user.access.club >= member.access.club.level) || user.access.district > 0);
 	});	
 }), function(req, res, next){
 	if(res.locals.member.password != null){

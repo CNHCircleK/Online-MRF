@@ -10,6 +10,11 @@ var db;
 
 var app = express();
 
+// dotenv for dev. TODO: move to host environment variables for production
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
@@ -61,7 +66,7 @@ app.use(function(err, req, res, next) {
   res.send({success: false, auth: false});
 });
 
-MongoClient.connect(config.mongoURL, function(error, database){
+MongoClient.connect(`mongodb+srv://cnhsoftware:${process.env.MONGO_SECRET}@portal-mlrqg.azure.mongodb.net/test?retryWrites=true&w=majority`, function(error, database){
 	if(error){
 		throw error;
 	}
