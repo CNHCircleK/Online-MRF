@@ -12,7 +12,6 @@ var app = express();
 
 // dotenv for dev. TODO: move to host environment variables for production
 if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
 }
 
 // view engine setup
@@ -66,7 +65,7 @@ app.use(function(err, req, res, next) {
   res.send({success: false, auth: false});
 });
 
-MongoClient.connect(`${process.env.MONGO_STRING}?retryWrites=true&w=majority`, function(error, database){
+MongoClient.connect(config.mongoURL, function(error, database){
 	if(error){
 		throw error;
 	}
