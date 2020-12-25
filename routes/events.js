@@ -551,9 +551,9 @@ router.get("/:eventId", checkAuth(function(req, res, auth){
 				delete verifiedOverrideHour.attendee_id;
 				verifiedOverrideHours.push({
 					attendee: member,
-					service: verifiedOverrideHours.service,
-					leadership: verifiedOverrideHours.leadership,
-					fellowship: verifiedOverrideHours.fellowship
+					service: verifiedOverrideHour.service,
+					leadership: verifiedOverrideHour.leadership,
+					fellowship: verifiedOverrideHour.fellowship
 				});
 			}
 
