@@ -496,7 +496,6 @@ router.get("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 		var eventProjection = {name: 1, time: 1, tags: 1, totals: 1};
 		app.db.collection("events").find(eventQuery, {projection: eventProjection}).toArray(function(err, events){
 			if(err) throw err;
-			console.log(events);
 			mrf.importedEvents = events;
 
 			var checkTags = {};
@@ -832,7 +831,6 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 			});
 		}
 	}
-	console.log("Going to try patching now");
 
 	// tryAdd();
 
