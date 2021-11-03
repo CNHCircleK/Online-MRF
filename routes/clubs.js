@@ -885,6 +885,110 @@ router.patch("/:clubId/mrfs/:year/:month", checkAuth(function(req, res, auth){
 	// };
 });
 
+router.patch("/:clubId/mrfs/:year/:month/submit", checkAuth(function(req, res, auth){
+	getClub(req.params.clubId, {goals: 1, division_id: 1}, function(club){
+		if(club == null){
+			auth(false);
+			return;
+		}
+
+		var user = res.locals.user;
+		res.locals.club = club;
+
+		if(utils.isInt(req.params.year) && utils.isInt(req.params.month)){
+			req.params.year = Number(req.params.year);
+			req.params.month = Number(req.params.month);
+			var year = req.params.year;
+			var month = req.params.month;
+
+			if(month > 0 && month <= 12){
+				auth(club._id.equals(user.club_id) && user.access.club > 0);
+			}else{
+				auth(false);
+			}
+		}else{
+			auth(false);
+		}
+	});
+}), function(req, res, next){
+	var body = req.body;
+	if(Object.keys(body).length > 0){
+		if("submit" in body){
+			body.submit = 
+				body.submit === 'true' ? true
+				: body.submit === 'false' ? false
+				: body.submit;
+
+			if(body.submit === true || body.submit === false){
+				var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};
+				var updates = {$set: {status: body.submit ? 1 : 0}};
+				app.db.collection("mrfs").updateOne(query, updates, function(err, updateRes){
+					if(err) throw err;
+					res.send({success: true, auth: true});
+				});
+			}else{
+				res.send({success: false, auth: true, error: {submit: "Must be a boolean value"}});
+			}
+		}else{
+			res.send({success: false, auth: true, error: {submit: "Required"}});
+		}
+	}else{
+		res.send({success: false, auth: true, error: {submit: "Required"}});
+	}
+});
+
+router.patch("/:clubId/mrfs/:year/:month/submit", checkAuth(function(req, res, auth){
+	getClub(req.params.clubId, {goals: 1, division_id: 1}, function(club){
+		if(club == null){
+			auth(false);
+			return;
+		}
+
+		var user = res.locals.user;
+		res.locals.club = club;
+
+		if(utils.isInt(req.params.year) && utils.isInt(req.params.month)){
+			req.params.year = Number(req.params.year);
+			req.params.month = Number(req.params.month);
+			var year = req.params.year;
+			var month = req.params.month;
+
+			if(month > 0 && month <= 12){
+				auth(club._id.equals(user.club_id) && user.access.club > 0);
+			}else{
+				auth(false);
+			}
+		}else{
+			auth(false);
+		}
+	});
+}), function(req, res, next){
+	var body = req.body;
+	if(Object.keys(body).length > 0){
+		if("confirm" in body){
+			body.confirm = 
+				body.confirm === 'true' ? true
+				: body.confirm === 'false' ? false
+				: body.confirm;
+
+			if(body.confirm === true || body.confirm === false){
+				var query = {club_id: res.locals.club._id, year: req.params.year, month: req.params.month};
+				var updates = {$set: {status: body.confirm ? 2 : 1}};
+				app.db.collection("mrfs").updateOne(query, updates, function(err, updateRes){
+					if(err) throw err;
+					res.send({success: true, auth: true});
+				});
+			}else{
+				res.send({success: false, auth: true, error: {confirm: "Must be a boolean value"}});
+			}
+		}else{
+			res.send({success: false, auth: true, error: {confirm: "Required"}});
+		}
+	}else{
+		res.send({success: false, auth: true, error: {confirm: "Required"}});
+	}
+});
+
 module.exports = function(newApp){
 	app = newApp;
 	utils = require('mrf-utils')(app);
