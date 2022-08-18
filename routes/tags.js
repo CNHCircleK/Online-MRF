@@ -39,7 +39,7 @@ function getTags(tagIds, projection, callback){
 router.get("/", checkAuth(function(req, res, auth){
 	auth(true);
 }),function(req, res, next){
-	var tagProjection = {abbrev: 1, name: 1}
+	var tagProjection = {abbrev: 1, name: 1, description: 1}
 	var query = {active: true};
 
 	var body = req.query;
@@ -59,7 +59,7 @@ router.post("/", checkAuth(function(req, res, auth){
 }), function(req, res, next){
 	var body = req.body;
 	var errors = {};
-	utils.checkIn(body, ["name", "abbrev"], function(elem, res){
+	utils.checkIn(body, ["name", "abbrev", "description"], function(elem, res){
 		if(!res){
 			errors[elem] = "Required";
 		}
@@ -69,6 +69,7 @@ router.post("/", checkAuth(function(req, res, auth){
 		var data = {
 			name: String(body.name),
 			abbrev: String(body.abbrev).toUpperCase(),
+			description: String(body.description),
 			active: true
 		};
 		data = mongoSanitize.sanitize(data);
@@ -109,6 +110,10 @@ router.patch("/:tagId", checkAuth(function(req, res, auth){
 		data.abbrev = String(body.abbrev).toUpperCase();
 	}
 
+	if("description" in body){
+		data.description= String(body.description);
+	}
+	
 	if("active" in body){
 		var active = utils.toBool(body.active);
 		if(active != null){
