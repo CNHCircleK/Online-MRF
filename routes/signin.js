@@ -24,7 +24,7 @@ router.post('/', function(req, res, next){
 		return;
 	}
 
-	var query = {email: {$regex: "^" + String(mongoSanitize.sanitize(body['email'], {dryRun : false})) + "$", $options: "i"}};
+	var query = {email: {$regex: "^" + String(mongoSanitize.sanitize(body['email'])) + "$", $options: "i"}};
 	var projection = {name: 1, club_id: 1, division_id: 1, access: 1};
 
 	app.db.collection("members").findOne(query, projection, function(err, member){
